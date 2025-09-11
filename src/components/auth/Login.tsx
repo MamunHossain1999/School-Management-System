@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import toast from 'react-hot-toast';
-import { Eye, EyeOff, School, User, Lock, Mail } from 'lucide-react';
-import type { RootState } from '../../store';
-import type { AppDispatch } from '../../store';
-import { loginUser, clearError } from '../../store/slices/authSlice';
-import type { LoginCredentials } from '../../types';
+import React, { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate, Link } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
+import { Eye, EyeOff, School, Lock, Mail, Users, BookOpen, GraduationCap, Heart, Sparkles, Shield, Zap } from "lucide-react";
+import type { RootState } from "../../store";
+import type { AppDispatch } from "../../store";
+import { loginUser, clearError } from "../../store/slices/authSlice";
+import type { LoginCredentials } from "../../types";
 
 const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,33 +16,19 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { isLoading, error, isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch,
-  } = useForm<LoginCredentials>();
-
-  const selectedRole = watch('role');
+  const { register, handleSubmit, formState: { errors }, watch } = useForm<LoginCredentials>();
+  const selectedRole = watch("role");
 
   useEffect(() => {
+    console.log('🔍 Login useEffect triggered:', { isAuthenticated, user }); // Debug log
     if (isAuthenticated && user) {
-      // Redirect based on user role
+      console.log('🚀 Navigating to dashboard for role:', user.role); // Debug log
       switch (user.role) {
-        case 'admin':
-          navigate('/admin/dashboard');
-          break;
-        case 'teacher':
-          navigate('/teacher/dashboard');
-          break;
-        case 'student':
-          navigate('/student/dashboard');
-          break;
-        case 'parent':
-          navigate('/parent/dashboard');
-          break;
-        default:
-          navigate('/');
+        case "admin": navigate("/admin/dashboard"); break;
+        case "teacher": navigate("/teacher/dashboard"); break;
+        case "student": navigate("/student/dashboard"); break;
+        case "parent": navigate("/parent/dashboard"); break;
+        default: navigate("/"); 
       }
     }
   }, [isAuthenticated, user, navigate]);
@@ -55,170 +41,153 @@ const Login: React.FC = () => {
   }, [error, dispatch]);
 
   const onSubmit = async (data: LoginCredentials) => {
+    console.log('📝 Form submitted with data:', data); // Debug log
+    console.log('🔄 Starting login process...'); // Debug log
+    
     try {
-      await dispatch(loginUser(data)).unwrap();
-      toast.success('Login successful!');
+      console.log('📡 Dispatching loginUser action...'); // Debug log
+      const result = await dispatch(loginUser(data)).unwrap();
+      console.log('🎉 Login result received:', result); // Debug log
+      toast.success("Login successful!");
     } catch (error: any) {
-      toast.error(error);
+      console.error('❌ Login error in component:', error); // Debug log
+      console.error('❌ Error details:', JSON.stringify(error, null, 2)); // Debug log
+      toast.error(error || 'Login failed');
     }
   };
 
   const demoCredentials = {
-    admin: { email: 'admin@school.com', password: 'admin123' },
-    teacher: { email: 'teacher@school.com', password: 'teacher123' },
-    student: { email: 'student@school.com', password: 'student123' },
-    parent: { email: 'parent@school.com', password: 'parent123' },
+    admin: { email: "admin@school.com", password: "admin123" },
+    teacher: { email: "teacher@school.com", password: "teacher123" },
+    student: { email: "student@school.com", password: "student123" },
+    parent: { email: "parent@school.com", password: "parent123" },
   };
 
+  const roleIcons = { admin: Users, teacher: BookOpen, student: GraduationCap, parent: Heart };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="bg-primary-600 p-3 rounded-full">
-              <School className="h-8 w-8 text-white" />
-            </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-tr from-purple-900 via-indigo-900 to-slate-900 px-4">
+      {/* Glass Card */}
+      <div className="relative w-full max-w-4xl bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl shadow-xl grid lg:grid-cols-2 overflow-hidden">
+        
+        {/* Left Side - Info */}
+        <div className="hidden lg:flex flex-col justify-center p-12 bg-gradient-to-b from-purple-700 via-indigo-800 to-purple-900 text-white space-y-6">
+          <div className="flex items-center space-x-3">
+            <Sparkles className="w-6 h-6 text-yellow-400" />
+            <span className="font-semibold text-lg">Welcome to EduCare</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">School Management System</h1>
-          <p className="text-gray-600">Sign in to your account</p>
+          <h1 className="text-4xl font-extrabold leading-snug">
+            Sign in to your <span className="text-purple-300">Dashboard</span>
+          </h1>
+          <p className="text-gray-300 max-w-sm">
+            Access your personalized education management system with powerful tools and insights.
+          </p>
+          <div className="grid grid-cols-1 gap-4">
+            {[{ icon: Shield, text: "Secure Access", desc: "Protected login" },
+              { icon: Zap, text: "Fast Performance", desc: "Lightning speed" },
+              { icon: Users, text: "Multi-Role Support", desc: "All user types" }].map(({ icon: Icon, text, desc }) => (
+              <div key={text} className="flex items-start gap-3 p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all">
+                <Icon className="w-7 h-7 text-purple-400 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold">{text}</h3>
+                  <p className="text-gray-300 text-sm">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Login Form */}
-        <div className="card">
+        {/* Right Side - Form */}
+        <div className="p-8 sm:p-12 flex flex-col justify-center">
+          <div className="text-center mb-8">
+            <div className="mx-auto w-16 h-16 flex items-center justify-center bg-gradient-to-r from-purple-600 to-pink-500 rounded-2xl shadow-lg mb-4">
+              <School className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-white">Welcome Back</h2>
+            <p className="text-gray-400 mt-1">Sign in to continue your journey</p>
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            
             {/* Role Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Role
-              </label>
+              <label className="block text-sm font-medium text-gray-200 mb-2 text-center">Select Your Role</label>
               <div className="grid grid-cols-2 gap-3">
-                {(['admin', 'teacher', 'student', 'parent'] as const).map((role) => (
-                  <label key={role} className="relative">
-                    <input
-                      type="radio"
-                      value={role}
-                      {...register('role', { required: 'Please select a role' })}
-                      className="sr-only"
-                    />
-                    <div className={`p-3 border-2 rounded-lg cursor-pointer text-center transition-colors ${
-                      selectedRole === role
-                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}>
-                      <User className="h-5 w-5 mx-auto mb-1" />
-                      <span className="text-sm font-medium capitalize">{role}</span>
-                    </div>
-                  </label>
-                ))}
+                {(["admin", "teacher", "student", "parent"] as const).map(role => {
+                  const IconComponent = roleIcons[role];
+                  return (
+                    <label key={role} className="relative cursor-pointer group">
+                      <input type="radio" value={role} {...register("role", { required: "Please select a role" })} className="sr-only" />
+                      <div className={`p-4 rounded-xl flex flex-col items-center justify-center border transition-all ${selectedRole === role ? "border-purple-400 bg-purple-700/20 text-white shadow-md" : "border-white/20 hover:border-purple-400/50 hover:bg-white/5 text-gray-300"}`}>
+                        <IconComponent className="w-6 h-6 mb-2" />
+                        <span className="text-sm capitalize">{role}</span>
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
-              {errors.role && (
-                <p className="mt-1 text-sm text-red-600">{errors.role.message}</p>
-              )}
+              {errors.role && <p className="text-red-400 text-sm mt-2 text-center">{errors.role.message}</p>}
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
+              <label className="block text-sm text-gray-200 mb-2">Email Address</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="email"
-                  {...register('email', {
-                    required: 'Email is required',
-                    pattern: {
-                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                      message: 'Invalid email address',
-                    },
-                  })}
-                  className="input-field pl-10"
+                  {...register("email", { required: "Email is required", pattern: { value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, message: "Invalid email address" } })}
                   placeholder="Enter your email"
+                  className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
                 />
               </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-              )}
+              {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email.message}</p>}
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
+              <label className="block text-sm text-gray-200 mb-2">Password</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  {...register('password', {
-                    required: 'Password is required',
-                    minLength: {
-                      value: 6,
-                      message: 'Password must be at least 6 characters',
-                    },
-                  })}
-                  className="input-field pl-10 pr-10"
+                  type={showPassword ? "text" : "password"}
+                  {...register("password", { required: "Password is required", minLength: { value: 6, message: "Minimum 6 characters" } })}
                   placeholder="Enter your password"
+                  className="w-full pl-12 pr-12 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
                 />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-purple-400">
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-              )}
+              {errors.password && <p className="text-red-400 text-sm mt-1">{errors.password.message}</p>}
             </div>
 
             {/* Demo Credentials */}
             {selectedRole && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-800 font-medium mb-1">Demo Credentials:</p>
-                <p className="text-sm text-blue-700">
-                  Email: {demoCredentials[selectedRole].email}
-                </p>
-                <p className="text-sm text-blue-700">
-                  Password: {demoCredentials[selectedRole].password}
-                </p>
+              <div className="bg-purple-800/20 border border-purple-500/30 rounded-xl p-4 text-sm text-gray-300">
+                <p className="font-semibold mb-1">Demo Credentials for {selectedRole}:</p>
+                <p><span className="text-purple-300">Email:</span> {demoCredentials[selectedRole].email}</p>
+                <p><span className="text-purple-300">Password:</span> {demoCredentials[selectedRole].password}</p>
               </div>
             )}
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+            {/* Submit */}
+            <button type="submit" disabled={isLoading} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg transition-all disabled:opacity-50">
+              {isLoading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Signing in...
+                </div>
+              ) : "Sign In to Dashboard"}
             </button>
           </form>
 
           {/* Footer */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
-                Register here
-              </Link>
+          <div className="mt-8 text-center space-y-2">
+            <p className="text-sm text-gray-400">
+              New to EduCare? <Link to="/register" className="text-purple-400 hover:underline">Create Account</Link>
             </p>
-            <Link
-              to="/forgot-password"
-              className="text-sm text-primary-600 hover:text-primary-500 mt-2 inline-block"
-            >
-              Forgot your password?
-            </Link>
+            <Link to="/forgot-password" className="text-sm text-gray-400 hover:text-purple-400 transition-colors">Forgot your password?</Link>
           </div>
         </div>
       </div>
