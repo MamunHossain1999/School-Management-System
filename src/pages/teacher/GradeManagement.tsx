@@ -61,7 +61,7 @@ const GradeManagement: React.FC = () => {
     isActive: true 
   }, { skip: !selectedClass });
   const { data: studentsData = [], isLoading: studentsLoading } = useGetUsersByRoleQuery('student');
-  const students = studentsData; // Using User[] data directly since it contains the needed properties
+  const students = studentsData.filter(user => user.role === 'student') as unknown as Student[]; // Safe type conversion
   const { data: results = [], isLoading: resultsLoading } = useGetResultsQuery({}) as { data: Result[], isLoading: boolean };
   
   const [updateResult] = useUpdateResultMutation();
@@ -130,7 +130,7 @@ const GradeManagement: React.FC = () => {
       const processed = students
         .filter(() => true) // Remove classId filter since User doesn't have classId property
         .map(student => {
-          const studentResults = results.filter((result: Result) => result.student === student.id);
+          const studentResults = results.filter((result: Result) => result.student === student._id);
           const studentSubjects: { [key: string]: { marks: number; totalMarks: number; grade: string; resultId?: string } } = {};
           let totalMarks = 0;
           let totalPossible = 0;
@@ -161,7 +161,7 @@ const GradeManagement: React.FC = () => {
           return {
             id: student._id,
             name: `${student.firstName} ${student.lastName}`,
-            rollNumber: 'N/A', // rollNumber not available in User interface
+            rollNumber: student.rollNumber || 'N/A', // Now properly accessing rollNumber from Student type
             email: student.email,
             subjects: studentSubjects,
             totalMarks,
@@ -236,8 +236,9 @@ const GradeManagement: React.FC = () => {
       if (subjectData?.resultId) {
         await updateResult({
           id: subjectData.resultId,
-          marks,
-          totalMarks: subjectData.totalMarks
+          data: {
+            marksObtained: marks
+          }
         }).unwrap();
         toast.success('Marks updated successfully');
       }

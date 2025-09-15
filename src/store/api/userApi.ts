@@ -4,17 +4,21 @@ import type { RootState } from '../index';
 
 export interface User {
   _id: string;
+  id?: string;
   firstName: string;
   lastName: string;
+  name: string;
   email: string;
   phone?: string;
   role: 'admin' | 'teacher' | 'student' | 'parent';
   isActive: boolean;
+  avatar?: string;
   profilePicture?: string;
   address?: string;
   dateOfBirth?: string;
+  joiningDate?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface CreateUserRequest {

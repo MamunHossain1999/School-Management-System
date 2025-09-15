@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
@@ -18,7 +19,7 @@ import type { User } from '../../types';
 
 const UserManagement: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { users, students, teachers, parents, isLoading } = useSelector(
+  const { users = [], students = [], teachers = [], parents = [], isLoading = false } = useSelector(
     (state: RootState) => state.user
   );
 
@@ -43,18 +44,14 @@ const UserManagement: React.FC = () => {
       try {
         await dispatch(deleteUser(userId)).unwrap();
         toast.success('User deleted successfully');
-      } catch (error: unknown) {
-        let errorMessage = 'Failed to delete user';
-        if (error && typeof error === 'object' && 'message' in error) {
-          errorMessage = `Failed to delete user: ${(error as { message?: string }).message}`;
-        }
-        toast.error(errorMessage);
+      } catch (error: any) {
+        toast.error(error?.message || 'Failed to delete user');
       }
     }
   };
 
   const handleEditUser = (user: User) => {
-    void user; // placeholder for edit logic
+    console.log('Edit user:', user);
   };
 
   const getRoleColor = (role: string) => {
@@ -88,9 +85,7 @@ const UserManagement: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600">Manage all users in the system</p>
         </div>
-        <button
-          className="btn-primary flex items-center space-x-2"
-        >
+        <button className="btn-primary flex items-center space-x-2">
           <UserPlus className="h-5 w-5" />
           <span>Add User</span>
         </button>
@@ -99,7 +94,7 @@ const UserManagement: React.FC = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
-          <div key={index} className="card">
+          <div key={index} className="card p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">{stat.label}</p>
@@ -114,7 +109,7 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="card">
+      <div className="card p-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
             {/* Search */}
@@ -124,7 +119,7 @@ const UserManagement: React.FC = () => {
                 type="text"
                 placeholder="Search users..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
@@ -132,7 +127,7 @@ const UserManagement: React.FC = () => {
             {/* Role Filter */}
             <select
               value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedRole(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">All Roles</option>
@@ -157,7 +152,7 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* Users Table */}
-      <div className="card">
+      <div className="card p-4">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -189,9 +184,10 @@ const UserManagement: React.FC = () => {
                   const initial = fullName ? fullName.charAt(0).toUpperCase() : '';
                   const role = user.role ?? '';
                   const formattedRole = role ? role.charAt(0).toUpperCase() + role.slice(1) : 'N/A';
+                  const userId = user._id || user._id || '';
 
                   return (
-                    <tr key={user.id ?? user._id} className="hover:bg-gray-50">
+                    <tr key={userId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10">
@@ -201,7 +197,7 @@ const UserManagement: React.FC = () => {
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">{fullName || 'N/A'}</div>
-                            <div className="text-sm text-gray-500">{user.email || 'N/A'}</div>
+                            <div className="text-sm text-gray-500">{user.email ?? 'N/A'}</div>
                           </div>
                         </div>
                       </td>
@@ -210,7 +206,7 @@ const UserManagement: React.FC = () => {
                           {formattedRole}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.phone || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.phone ?? 'N/A'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(user.isActive ?? false)}`}>
                           {user.isActive ? 'Active' : 'Inactive'}
@@ -227,7 +223,7 @@ const UserManagement: React.FC = () => {
                           <button className="text-gray-600 hover:text-gray-900" title="View">
                             <Eye className="h-4 w-4" />
                           </button>
-                          <button onClick={() => handleDeleteUser(user.id ?? user._id)} className="text-red-600 hover:text-red-900" title="Delete">
+                          <button onClick={() => handleDeleteUser(userId)} className="text-red-600 hover:text-red-900" title="Delete">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -242,7 +238,7 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* Pagination */}
-      <div className="card">
+      <div className="card p-4">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-700">
             Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredUsers.length}</span> of <span className="font-medium">{filteredUsers.length}</span> results
