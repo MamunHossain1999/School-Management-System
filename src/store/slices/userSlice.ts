@@ -1,15 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createSlice, createAsyncThunk, type PayloadAction,  } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import type { User } from "../api/userApi";
+import { userApi } from "../api";
 
-import { userAPI } from '../../services/api';
-import type { Admin, Parent, Student, Teacher, User } from '../../types';
 
 interface UserState {
   users: User[];
-  students: Student[];
-  teachers: Teacher[];
-  parents: Parent[];
-  admins: Admin[];
+  students: User[];
+  teachers: User[];
+  parents: User[];
+  admins: User[];
   currentUser: User | null;
   isLoading: boolean;
   error: string | null;
@@ -26,69 +26,79 @@ const initialState: UserState = {
   error: null,
 };
 
-// Async thunks
-export const fetchUsers = createAsyncThunk(
-  'user/fetchUsers',
-  async (role: string | undefined, { rejectWithValue }) => {
+// ✅ Async Thunks
+export const fetchUsers = createAsyncThunk<User[], string | undefined, { rejectValue: string }>(
+  "user/fetchUsers",
+  async (role, { rejectWithValue, dispatch }) => {
     try {
-      const response = await userAPI.getUsers(role);
-      if (response.success) {
-        return response.data;
+      const params = role ? { role } : {};
+      const result = await dispatch(userApi.endpoints.getUsers.initiate(params));
+      
+      if ('data' in result && result.data) {
+        return Array.isArray(result.data) ? result.data : [result.data];
       }
-      return rejectWithValue(response.message);
+      
+      return rejectWithValue("Failed to fetch users");
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch users');
+      return rejectWithValue(error.message || "Failed to fetch users");
     }
   }
 );
 
-export const createUser = createAsyncThunk(
-  'user/createUser',
-  async (userData: Partial<User>, { rejectWithValue }) => {
+export const createUser = createAsyncThunk<User, { firstName: string; lastName: string; email: string; password: string; role: 'admin' | 'teacher' | 'student' | 'parent'; phone?: string; address?: string; dateOfBirth?: string }, { rejectValue: string }>(
+  "user/createUser",
+  async (userData, { rejectWithValue, dispatch }) => {
     try {
-      const response = await userAPI.createUser(userData);
-      if (response.success) {
-        return response.data;
+      const result = await dispatch(userApi.endpoints.createUser.initiate(userData));
+      
+      if ('data' in result && result.data) {
+        return result.data;
       }
-      return rejectWithValue(response.message);
+      
+      return rejectWithValue("Failed to create user");
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create user');
+      return rejectWithValue(error.message || "Failed to create user");
     }
   }
 );
 
-export const updateUser = createAsyncThunk(
-  'user/updateUser',
-  async ({ id, userData }: { id: string; userData: Partial<User> }, { rejectWithValue }) => {
+export const updateUser = createAsyncThunk<User, { id: string; userData: { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string; dateOfBirth?: string; profilePicture?: string } }, { rejectValue: string }>(
+  "user/updateUser",
+  async ({ id, userData }, { rejectWithValue, dispatch }) => {
     try {
-      const response = await userAPI.updateUser(id, userData);
-      if (response.success) {
-        return response.data;
+      const result = await dispatch(userApi.endpoints.updateUser.initiate({ id, data: userData }));
+      
+      if ('data' in result && result.data) {
+        return result.data;
       }
-      return rejectWithValue(response.message);
+      
+      return rejectWithValue("Failed to update user");
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to update user');
+      return rejectWithValue(error.message || "Failed to update user");
     }
   }
 );
 
-export const deleteUser = createAsyncThunk(
-  'user/deleteUser',
-  async (id: string, { rejectWithValue }) => {
+export const deleteUser = createAsyncThunk<string, string, { rejectValue: string }>(
+  "user/deleteUser",
+  async (id, { rejectWithValue, dispatch }) => {
     try {
-      const response = await userAPI.deleteUser(id);
-      if (response.success) {
+      const result = await dispatch(userApi.endpoints.deleteUser.initiate(id));
+      
+      if ('data' in result || !('error' in result)) {
         return id;
       }
-      return rejectWithValue(response.message);
+      
+      return rejectWithValue("Failed to delete user");
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to delete user');
+      return rejectWithValue(error.message || "Failed to delete user");
     }
   }
 );
 
+// ✅ Slice
 const userSlice = createSlice({
-  name: 'user',
+  name: "user",
   initialState,
   reducers: {
     clearError: (state) => {
@@ -107,92 +117,56 @@ const userSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch Users
       .addCase(fetchUsers.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.users = action.payload;
-        
-        // Separate users by role
-        state.students = action.payload.filter((user: User) => user.role === 'student') as Student[];
-        state.teachers = action.payload.filter((user: User) => user.role === 'teacher') as Teacher[];
-        state.parents = action.payload.filter((user: User) => user.role === 'parent') as Parent[];
-        state.admins = action.payload.filter((user: User) => user.role === 'admin') as Admin[];
+
+        // ✅ Payload নিশ্চিতভাবে array
+        const usersArray = Array.isArray(action.payload) ? action.payload : [action.payload];
+
+        state.users = usersArray;
+        state.students = usersArray.filter((u) => u.role === "student");
+        state.teachers = usersArray.filter((u) => u.role === "teacher");
+        state.parents = usersArray.filter((u) => u.role === "parent");
+        state.admins = usersArray.filter((u) => u.role === "admin");
       })
       .addCase(fetchUsers.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      // Create User
-      .addCase(createUser.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
       .addCase(createUser.fulfilled, (state, action) => {
         state.isLoading = false;
         state.users.push(action.payload);
-        
-        // Add to appropriate role array
+
         switch (action.payload.role) {
-          case 'student':
-            state.students.push(action.payload as Student);
+          case "student":
+            state.students.push(action.payload);
             break;
-          case 'teacher':
-            state.teachers.push(action.payload as Teacher);
+          case "teacher":
+            state.teachers.push(action.payload);
             break;
-          case 'parent':
-            state.parents.push(action.payload as Parent);
+          case "parent":
+            state.parents.push(action.payload);
             break;
-          case 'admin':
-            state.admins.push(action.payload as Admin);
+          case "admin":
+            state.admins.push(action.payload);
             break;
         }
       })
-      .addCase(createUser.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
-      // Update User
       .addCase(updateUser.fulfilled, (state, action) => {
-        const index = state.users.findIndex(user => user.id === action.payload.id);
-        if (index !== -1) {
-          state.users[index] = action.payload;
-        }
-        
-        // Update in role-specific arrays
-        const updateRoleArray = (array: any[], payload: any) => {
-          const roleIndex = array.findIndex(item => item.id === payload.id);
-          if (roleIndex !== -1) {
-            array[roleIndex] = payload;
-          }
-        };
-        
-        switch (action.payload.role) {
-          case 'student':
-            updateRoleArray(state.students, action.payload);
-            break;
-          case 'teacher':
-            updateRoleArray(state.teachers, action.payload);
-            break;
-          case 'parent':
-            updateRoleArray(state.parents, action.payload);
-            break;
-          case 'admin':
-            updateRoleArray(state.admins, action.payload);
-            break;
-        }
+        const index = state.users.findIndex((u) => u._id === action.payload._id);
+        if (index !== -1) state.users[index] = action.payload;
       })
-      // Delete User
       .addCase(deleteUser.fulfilled, (state, action) => {
         const userId = action.payload;
-        state.users = state.users.filter(user => user.id !== userId);
-        state.students = state.students.filter(student => student.id !== userId);
-        state.teachers = state.teachers.filter(teacher => teacher.id !== userId);
-        state.parents = state.parents.filter(parent => parent.id !== userId);
-        state.admins = state.admins.filter(admin => admin.id !== userId);
+        state.users = state.users.filter((u) => u._id !== userId);
+        state.students = state.students.filter((s) => s._id !== userId);
+        state.teachers = state.teachers.filter((t) => t._id !== userId);
+        state.parents = state.parents.filter((p) => p._id !== userId);
+        state.admins = state.admins.filter((a) => a._id !== userId);
       });
   },
 });

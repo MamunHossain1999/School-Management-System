@@ -6,7 +6,6 @@ import {
   Phone, 
   Mail, 
   Globe, 
-  Upload, 
   Save,
   Edit,
   Camera
@@ -52,9 +51,10 @@ const SchoolInfo: React.FC = () => {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Submitted school info:', data);
       toast.success('School information updated successfully');
       setIsEditing(false);
-    } catch (error) {
+    } catch {
       toast.error('Failed to update school information');
     }
   };

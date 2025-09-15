@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { Notice } from '../../types';
-import { noticeAPI } from '../../services/api';
+import Cookies from 'js-cookie';
+
+
 
 interface NoticeState {
   notices: Notice[];
@@ -17,30 +19,57 @@ const initialState: NoticeState = {
   error: null,
 };
 
+// 🔹 Fetch notices
 export const fetchNotices = createAsyncThunk(
   'notice/fetchNotices',
-  async (userRole: string | undefined, { rejectWithValue }) => {
+  async (params: { targetAudience?: string; type?: string; isActive?: boolean } = {}, { rejectWithValue }) => {
     try {
-      const response = await noticeAPI.getNotices(userRole);
-      if (response.success) {
-        return response.data;
+      const token = Cookies.get('token');
+      const queryParams = new URLSearchParams(params as any).toString();
+      const url = `${import.meta.env.VITE_BASE_URL || 'http://localhost:5000'}/api/notices${queryParams ? `?${queryParams}` : ''}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch notices');
       }
-      return rejectWithValue(response.message);
+      
+      const data = await response.json();
+      return data.data || data;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch notices');
     }
   }
 );
 
+// 🔹 Create notice
 export const createNotice = createAsyncThunk(
   'notice/createNotice',
   async (noticeData: Partial<Notice>, { rejectWithValue }) => {
     try {
-      const response = await noticeAPI.createNotice(noticeData);
-      if (response.success) {
-        return response.data;
+      const token = Cookies.get('token');
+      const response = await fetch(`${import.meta.env.VITE_BASE_URL || 'http://localhost:5000'}/api/notices`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(noticeData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create notice');
       }
-      return rejectWithValue(response.message);
+      
+      const data = await response.json();
+      return data.data || data;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to create notice');
     }
@@ -61,6 +90,7 @@ const noticeSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // 🔹 Fetch notices
       .addCase(fetchNotices.pending, (state) => {
         state.isLoading = true;
         state.error = null;
@@ -73,6 +103,8 @@ const noticeSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
+
+      // 🔹 Create notice
       .addCase(createNotice.fulfilled, (state, action) => {
         state.notices.unshift(action.payload);
       });

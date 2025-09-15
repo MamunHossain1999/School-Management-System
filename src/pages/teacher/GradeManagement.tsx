@@ -1,32 +1,38 @@
-import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   BookOpen, 
-  Users, 
-  TrendingUp, 
   Award,
   Edit,
-  Save,
   X,
   Check,
-  Filter,
   Download,
   Search,
-  Calculator
+  Calculator,
+  Loader2
 } from 'lucide-react';
-import { RootState, AppDispatch } from '../../store';
-import { fetchResults, updateResult } from '../../store/slices/examSlice';
 import toast from 'react-hot-toast';
+import { 
+  useGetExamsQuery, 
+  useGetResultsQuery, 
+  useUpdateResultMutation,
+  type Result,
+  type Exam
+} from '../../store/api/examApi';
+import { useGetClassesQuery, useGetSubjectsQuery } from '../../store/api/academicApi';
+import { useGetUsersByRoleQuery } from '../../store/api/userApi';
+import type { Student } from '../../types';
 
 interface StudentGrade {
   id: string;
   name: string;
   rollNumber: string;
+  email: string;
   subjects: {
     [key: string]: {
       marks: number;
       totalMarks: number;
       grade: string;
+      resultId?: string;
     };
   };
   totalMarks: number;
@@ -37,29 +43,36 @@ interface StudentGrade {
 }
 
 const GradeManagement: React.FC = () => {
-  const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((state: RootState) => state.auth);
-  
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedExam, setSelectedExam] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCell, setEditingCell] = useState<{studentId: string, subject: string} | null>(null);
   const [tempValue, setTempValue] = useState('');
+  const [processedStudents, setProcessedStudents] = useState<StudentGrade[]>([]);
 
-  // Mock data
-  const subjects = ['Mathematics', 'Physics', 'Chemistry', 'English', 'Biology'];
-  const exams = [
-    { id: '1', name: 'Mid Term Exam', date: '2024-01-15' },
-    { id: '2', name: 'Final Exam', date: '2024-03-15' },
-    { id: '3', name: 'Unit Test 1', date: '2024-01-05' },
-  ];
+  // API queries
+  const { data: classes = [], isLoading: classesLoading } = useGetClassesQuery();
+  const { data: subjects = [], isLoading: subjectsLoading } = useGetSubjectsQuery({ 
+    classId: selectedClass 
+  }, { skip: !selectedClass });
+  const { data: exams = [], isLoading: examsLoading } = useGetExamsQuery({ 
+    classId: selectedClass,
+    isActive: true 
+  }, { skip: !selectedClass });
+  const { data: studentsData = [], isLoading: studentsLoading } = useGetUsersByRoleQuery('student');
+  const students = studentsData; // Using User[] data directly since it contains the needed properties
+  const { data: results = [], isLoading: resultsLoading } = useGetResultsQuery({}) as { data: Result[], isLoading: boolean };
+  
+  const [updateResult] = useUpdateResultMutation();
 
-  const [students, setStudents] = useState<StudentGrade[]>([
+  // Mock data as fallback (memoized to prevent re-renders)
+  const mockStudents = useMemo((): StudentGrade[] => [
     {
       id: '1',
       name: 'John Smith',
       rollNumber: '001',
+      email: 'john.smith@school.edu',
       subjects: {
         Mathematics: { marks: 85, totalMarks: 100, grade: 'A' },
         Physics: { marks: 78, totalMarks: 100, grade: 'B+' },
@@ -77,6 +90,7 @@ const GradeManagement: React.FC = () => {
       id: '2',
       name: 'Emma Johnson',
       rollNumber: '002',
+      email: 'emma.johnson@school.edu',
       subjects: {
         Mathematics: { marks: 95, totalMarks: 100, grade: 'A+' },
         Physics: { marks: 89, totalMarks: 100, grade: 'A' },
@@ -94,6 +108,7 @@ const GradeManagement: React.FC = () => {
       id: '3',
       name: 'Michael Brown',
       rollNumber: '003',
+      email: 'michael.brown@school.edu',
       subjects: {
         Mathematics: { marks: 72, totalMarks: 100, grade: 'B' },
         Physics: { marks: 68, totalMarks: 100, grade: 'B-' },
@@ -107,9 +122,67 @@ const GradeManagement: React.FC = () => {
       overallGrade: 'B',
       rank: 3
     },
-  ]);
+  ], []);
 
-  const filteredStudents = students.filter(student =>
+  // Process real data when available
+  useEffect(() => {
+    if (students.length > 0 && results.length > 0 && subjects.length > 0) {
+      const processed = students
+        .filter(() => true) // Remove classId filter since User doesn't have classId property
+        .map(student => {
+          const studentResults = results.filter((result: Result) => result.student === student.id);
+          const studentSubjects: { [key: string]: { marks: number; totalMarks: number; grade: string; resultId?: string } } = {};
+          let totalMarks = 0;
+          let totalPossible = 0;
+
+          subjects.forEach(subject => {
+            const subjectResult = studentResults.find((result: Result) => {
+              // Handle both string and object exam types
+              const examSubject = typeof result.exam === 'string' ? result.exam : (result.exam as Exam)?.subject;
+              return examSubject === subject.id || examSubject === subject.name;
+            });
+            const marks = subjectResult?.marksObtained || 0;
+            const maxMarks = typeof subjectResult?.exam === 'object' ? (subjectResult.exam as Exam).totalMarks : 100;
+            const percentage = maxMarks > 0 ? (marks / maxMarks) * 100 : 0;
+            
+            studentSubjects[subject.name] = {
+              marks,
+              totalMarks: maxMarks,
+              grade: calculateGrade(percentage),
+              resultId: subjectResult?._id
+            };
+            
+            totalMarks += marks;
+            totalPossible += maxMarks;
+          });
+
+          const overallPercentage = totalPossible > 0 ? (totalMarks / totalPossible) * 100 : 0;
+
+          return {
+            id: student._id,
+            name: `${student.firstName} ${student.lastName}`,
+            rollNumber: 'N/A', // rollNumber not available in User interface
+            email: student.email,
+            subjects: studentSubjects,
+            totalMarks,
+            totalPossible,
+            percentage: overallPercentage,
+            overallGrade: calculateGrade(overallPercentage),
+            rank: 0 // Will be calculated after sorting
+          };
+        })
+        .sort((a, b) => b.percentage - a.percentage)
+        .map((student, index) => ({ ...student, rank: index + 1 }));
+
+      setProcessedStudents(processed);
+    } else {
+      // Use mock data when real data is not available
+      setProcessedStudents(mockStudents);
+    }
+  }, [students, results, subjects, selectedClass, selectedExam, mockStudents]);
+
+  const displayStudents = processedStudents.length > 0 ? processedStudents : mockStudents;
+  const filteredStudents = displayStudents.filter(student =>
     student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.rollNumber.includes(searchTerm)
   );
@@ -148,14 +221,32 @@ const GradeManagement: React.FC = () => {
     setTempValue(currentMarks.toString());
   };
 
-  const handleEditSave = (studentId: string, subject: string) => {
+  const handleEditSave = async (studentId: string, subject: string) => {
     const marks = parseInt(tempValue);
     if (isNaN(marks) || marks < 0 || marks > 100) {
       toast.error('Please enter valid marks (0-100)');
       return;
     }
 
-    setStudents(prev => prev.map(student => {
+    try {
+      // Find the result to update
+      const student = displayStudents.find(s => s.id === studentId);
+      const subjectData = student?.subjects[subject];
+      
+      if (subjectData?.resultId) {
+        await updateResult({
+          id: subjectData.resultId,
+          marks,
+          totalMarks: subjectData.totalMarks
+        }).unwrap();
+        toast.success('Marks updated successfully');
+      }
+    } catch (error) {
+      toast.error('Failed to update marks');
+      console.error('Update error:', error);
+    }
+
+    setProcessedStudents(prev => prev.map(student => {
       if (student.id === studentId) {
         const updatedSubjects = {
           ...student.subjects,
@@ -182,7 +273,6 @@ const GradeManagement: React.FC = () => {
 
     setEditingCell(null);
     setTempValue('');
-    toast.success('Marks updated successfully');
   };
 
   const handleEditCancel = () => {
@@ -191,11 +281,11 @@ const GradeManagement: React.FC = () => {
   };
 
   const classStats = {
-    totalStudents: students.length,
-    averagePercentage: students.reduce((sum, student) => sum + student.percentage, 0) / students.length,
-    highestScore: Math.max(...students.map(s => s.percentage)),
-    lowestScore: Math.min(...students.map(s => s.percentage)),
-    passRate: (students.filter(s => s.percentage >= 50).length / students.length) * 100
+    totalStudents: filteredStudents.length,
+    averagePercentage: filteredStudents.length > 0 ? filteredStudents.reduce((sum, student) => sum + student.percentage, 0) / filteredStudents.length : 0,
+    highestScore: filteredStudents.length > 0 ? Math.max(...filteredStudents.map(s => s.percentage)) : 0,
+    lowestScore: filteredStudents.length > 0 ? Math.min(...filteredStudents.map(s => s.percentage)) : 0,
+    passRate: filteredStudents.length > 0 ? (filteredStudents.filter(s => s.percentage >= 50).length / filteredStudents.length) * 100 : 0
   };
 
   return (
@@ -251,13 +341,19 @@ const GradeManagement: React.FC = () => {
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
               className="input-field"
+              disabled={classesLoading}
             >
               <option value="">Select Class</option>
-              <option value="10A">Class 10-A</option>
-              <option value="10B">Class 10-B</option>
-              <option value="11A">Class 11-A</option>
-              <option value="11B">Class 11-B</option>
+              {classes.map(cls => (
+                <option key={cls.id} value={cls.id}>{cls.name}</option>
+              ))}
             </select>
+            {classesLoading && (
+              <div className="flex items-center mt-1 text-sm text-gray-500">
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                Loading classes...
+              </div>
+            )}
           </div>
 
           <div>
@@ -266,12 +362,19 @@ const GradeManagement: React.FC = () => {
               value={selectedExam}
               onChange={(e) => setSelectedExam(e.target.value)}
               className="input-field"
+              disabled={examsLoading || !selectedClass}
             >
               <option value="">Select Exam</option>
               {exams.map(exam => (
-                <option key={exam.id} value={exam.id}>{exam.name}</option>
+                <option key={exam._id} value={exam._id}>{exam.title}</option>
               ))}
             </select>
+            {examsLoading && selectedClass && (
+              <div className="flex items-center mt-1 text-sm text-gray-500">
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                Loading exams...
+              </div>
+            )}
           </div>
 
           <div>
@@ -280,12 +383,19 @@ const GradeManagement: React.FC = () => {
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
               className="input-field"
+              disabled={subjectsLoading || !selectedClass}
             >
               <option value="">All Subjects</option>
               {subjects.map(subject => (
-                <option key={subject} value={subject}>{subject}</option>
+                <option key={subject.id} value={subject.name}>{subject.name}</option>
               ))}
             </select>
+            {subjectsLoading && selectedClass && (
+              <div className="flex items-center mt-1 text-sm text-gray-500">
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                Loading subjects...
+              </div>
+            )}
           </div>
 
           <div>
@@ -304,6 +414,15 @@ const GradeManagement: React.FC = () => {
         </div>
       </div>
 
+      {/* Loading State */}
+      {(studentsLoading || resultsLoading) && selectedClass && selectedExam && (
+        <div className="card text-center py-12">
+          <Loader2 className="h-12 w-12 text-primary-500 mx-auto mb-4 animate-spin" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Loading Grade Data</h3>
+          <p className="text-gray-600">Please wait while we fetch the latest results...</p>
+        </div>
+      )}
+
       {/* Grades Table */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
@@ -313,7 +432,7 @@ const GradeManagement: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Student
                 </th>
-                {subjects.map(subject => (
+                {(subjects.length > 0 ? subjects.map(s => s.name) : ['Mathematics', 'Physics', 'Chemistry', 'English', 'Biology']).map(subject => (
                   <th key={subject} className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {subject}
                   </th>
@@ -346,7 +465,7 @@ const GradeManagement: React.FC = () => {
                     </div>
                   </td>
                   
-                  {subjects.map(subject => (
+                  {(subjects.length > 0 ? subjects.map(s => s.name) : ['Mathematics', 'Physics', 'Chemistry', 'English', 'Biology']).map(subject => (
                     <td key={subject} className="px-6 py-4 whitespace-nowrap text-center">
                       {editingCell?.studentId === student.id && editingCell?.subject === subject ? (
                         <div className="flex items-center justify-center space-x-1">

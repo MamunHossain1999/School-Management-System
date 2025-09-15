@@ -11,8 +11,9 @@ import {
   MessageSquare
 } from 'lucide-react';
 
-import { useGetAssignmentsQuery } from '../../store/api/academicApi';
+
 import type { RootState } from '../../store';
+import { useGetAssignmentsQuery } from '../../store/api/assignmentApi';
 
 
 const TeacherDashboard: React.FC = () => {
@@ -20,7 +21,7 @@ const TeacherDashboard: React.FC = () => {
   
   // Use RTK Query hooks to fetch data
   const { data: assignments = [] } = useGetAssignmentsQuery(
-    user?.id ? { teacherId: user.id } : undefined,
+    {},
     { skip: !user?.id }
   );
 

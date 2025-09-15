@@ -1,7 +1,10 @@
 export interface User {
-  id: string;
+  _id: string;
+  id?: string;
   email: string;
   name: string;
+  firstName: string;
+  lastName: string;
   role: 'admin' | 'teacher' | 'student' | 'parent';
   avatar?: string;
   phone?: string;
@@ -9,6 +12,7 @@ export interface User {
   dateOfBirth?: string;
   joiningDate?: string;
   isActive: boolean;
+  createdAt: string
 }
 
 export interface Student extends User {
@@ -75,10 +79,12 @@ export interface Subject {
 export interface Attendance {
   id: string;
   studentId: string;
+  studentName?: string;
   classId: string;
   sectionId: string;
   date: string;
   status: 'present' | 'absent' | 'late' | 'excused';
+  present?: boolean; // For UI convenience
   markedBy: string;
   remarks?: string;
 }
@@ -115,7 +121,9 @@ export interface Result {
   id: string;
   studentId: string;
   examId: string;
+  subjectId: string;
   marksObtained: number;
+  totalMarks: number;
   grade: string;
   remarks?: string;
   evaluatedBy: string;
@@ -149,11 +157,13 @@ export interface Fee {
 
 export interface AuthState {
   user: User | null;
-  token: string | null;
+  token: string | null;        // এখানে accessToken রাখা হবে
+  refreshToken: string | null; // চাইলে refreshToken আলাদা রাখুন
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
 }
+
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -169,6 +179,9 @@ export interface LoginCredentials {
 }
 
 export interface RegisterData extends Omit<User, 'id' | 'isActive'> {
+  email: string;
+  firstName: string;   // fastName → firstName
+  lastName: string;
   password: string;
   confirmPassword: string;
   terms?: boolean;
@@ -194,3 +207,4 @@ export interface RegisterData extends Omit<User, 'id' | 'isActive'> {
   permissions?: string[];
   department?: string;
 }
+

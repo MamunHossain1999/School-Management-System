@@ -1,124 +1,143 @@
-import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { 
-  FileText, 
-  Plus, 
-  Calendar, 
-  Clock, 
-  Users, 
+import React, { useState } from 'react';
+import {
+  FileText,
+  Plus,
+  Calendar,
+  Clock,
+  Users,
   Eye,
   Edit,
   Trash2,
-  Download,
+  
   Upload,
   Search,
-  Filter
 } from 'lucide-react';
-import { RootState, AppDispatch } from '../../store';
-import { fetchAssignments, createAssignment } from '../../store/slices/academicSlice';
-import { Assignment } from '../../types';
+import { useCreateAssignmentMutation, useGetAssignmentsQuery } from '../../store/api/assignmentApi';
 import toast from 'react-hot-toast';
 
+// Modal Component (Create Assignment)
+interface CreateAssignmentData {
+  title: string;
+  description: string;
+  class: string;
+  dueDate: string;
+  totalMarks: number;
+}
+
+interface CreateAssignmentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreate: (assignment: CreateAssignmentData) => void;
+}
+
+const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ isOpen, onClose, onCreate }) => {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [classValue, setClassValue] = useState('');
+  const [dueDate, setDueDate] = useState('');
+
+  const handleSubmit = () => {
+    if (!title || !description || !classValue || !dueDate) {
+      toast.error('All fields are required');
+      return;
+    }
+    onCreate({ title, description, class: classValue, dueDate, totalMarks: 100 });
+    onClose();
+    setTitle('');
+    setDescription('');
+    setClassValue('');
+    setDueDate('');
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold mb-4">Create Assignment</h2>
+        <div className="space-y-3">
+          <input
+            type="text"
+            placeholder="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <textarea
+            placeholder="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <select
+            value={classValue}
+            onChange={(e) => setClassValue(e.target.value)}
+            className="w-full border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">Select Class</option>
+            <option value="10A">Class 10-A</option>
+            <option value="10B">Class 10-B</option>
+            <option value="11A">Class 11-A</option>
+            <option value="11B">Class 11-B</option>
+          </select>
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="w-full border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+        <div className="mt-4 flex justify-end space-x-2">
+          <button onClick={onClose} className="btn-secondary">Cancel</button>
+          <button onClick={handleSubmit} className="btn-primary">Create</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AssignmentManagement: React.FC = () => {
-  const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { assignments } = useSelector((state: RootState) => state.academic);
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Mock assignments data
-  const mockAssignments = [
-    {
-      id: '1',
-      title: 'Physics Lab Report - Motion Analysis',
-      description: 'Complete the lab report on projectile motion experiment conducted in class.',
-      subjectId: 'physics',
-      classId: '10A',
-      sectionId: 'A',
-      teacherId: user?.id || '',
-      dueDate: '2024-01-20',
-      totalMarks: 50,
-      attachments: ['lab_instructions.pdf'],
-      createdAt: '2024-01-10',
-      submissions: 25,
-      totalStudents: 30,
-      status: 'active'
-    },
-    {
-      id: '2',
-      title: 'Mathematics Problem Set - Calculus',
-      description: 'Solve problems 1-20 from Chapter 5: Derivatives and Applications.',
-      subjectId: 'math',
-      classId: '11B',
-      sectionId: 'B',
-      teacherId: user?.id || '',
-      dueDate: '2024-01-18',
-      totalMarks: 100,
-      attachments: [],
-      createdAt: '2024-01-08',
-      submissions: 28,
-      totalStudents: 32,
-      status: 'active'
-    },
-    {
-      id: '3',
-      title: 'English Essay - Climate Change',
-      description: 'Write a 1000-word essay on the impact of climate change on global ecosystems.',
-      subjectId: 'english',
-      classId: '10A',
-      sectionId: 'A',
-      teacherId: user?.id || '',
-      dueDate: '2024-01-15',
-      totalMarks: 75,
-      attachments: ['essay_guidelines.pdf'],
-      createdAt: '2024-01-05',
-      submissions: 30,
-      totalStudents: 30,
-      status: 'completed'
-    }
-  ];
+  // RTK Query hooks
+  const { data: assignments = [] } = useGetAssignmentsQuery({});
+  const [createAssignment] = useCreateAssignmentMutation();
 
-  const [assignmentsList, setAssignmentsList] = useState(mockAssignments);
-
-  useEffect(() => {
-    if (user?.id) {
-      dispatch(fetchAssignments({ teacherId: user.id }));
-    }
-  }, [dispatch, user?.id]);
-
-  const filteredAssignments = assignmentsList.filter(assignment => {
-    const matchesClass = selectedClass === '' || assignment.classId === selectedClass;
-    const matchesSearch = assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         assignment.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || assignment.status === statusFilter;
+  const filteredAssignments = assignments.filter(a => {
+    const matchesClass = selectedClass === '' || a.class === selectedClass;
+    const matchesSearch = a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          a.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || (statusFilter === 'overdue' ? new Date(a.dueDate) < new Date() : statusFilter === 'active');
     return matchesClass && matchesSearch && matchesStatus;
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'completed': return 'bg-blue-100 text-blue-800';
-      case 'overdue': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+
+  const handleCreateAssignment = async (newAssignment: CreateAssignmentData) => {
+    try {
+      await createAssignment({
+        title: newAssignment.title,
+        description: newAssignment.description,
+        subject: 'General', // You may want to add subject selection
+        class: newAssignment.class,
+        section: 'A', // You may want to add section selection
+        dueDate: newAssignment.dueDate,
+        totalMarks: newAssignment.totalMarks,
+      }).unwrap();
+      toast.success('Assignment created successfully');
+    } catch {
+      toast.error('Failed to create assignment');
     }
   };
 
-  const getSubmissionRate = (submissions: number, total: number) => {
-    return Math.round((submissions / total) * 100);
-  };
-
-  const isOverdue = (dueDate: string) => {
-    return new Date(dueDate) < new Date();
-  };
-
   const stats = [
-    { label: 'Total Assignments', value: assignmentsList.length, color: 'bg-blue-500' },
-    { label: 'Active', value: assignmentsList.filter(a => a.status === 'active').length, color: 'bg-green-500' },
-    { label: 'Completed', value: assignmentsList.filter(a => a.status === 'completed').length, color: 'bg-purple-500' },
-    { label: 'Overdue', value: assignmentsList.filter(a => isOverdue(a.dueDate) && a.status === 'active').length, color: 'bg-red-500' },
+    { label: 'Total Assignments', value: assignments.length, color: 'bg-blue-500' },
+    { label: 'Active', value: assignments.filter(a => new Date(a.dueDate) >= new Date()).length, color: 'bg-green-500' },
+    { label: 'Completed', value: 0, color: 'bg-purple-500' }, // You may want to add completion tracking
+    { label: 'Overdue', value: assignments.filter(a => new Date(a.dueDate) < new Date()).length, color: 'bg-red-500' },
   ];
 
   return (
@@ -159,7 +178,6 @@ const AssignmentManagement: React.FC = () => {
       <div className="card">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
@@ -170,8 +188,6 @@ const AssignmentManagement: React.FC = () => {
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
-
-            {/* Class Filter */}
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
@@ -183,8 +199,6 @@ const AssignmentManagement: React.FC = () => {
               <option value="11A">Class 11-A</option>
               <option value="11B">Class 11-B</option>
             </select>
-
-            {/* Status Filter */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -196,31 +210,20 @@ const AssignmentManagement: React.FC = () => {
               <option value="overdue">Overdue</option>
             </select>
           </div>
-
-          <div className="flex space-x-2">
-            <button className="btn-secondary flex items-center space-x-2">
-              <Download className="h-4 w-4" />
-              <span>Export</span>
-            </button>
-          </div>
         </div>
       </div>
 
       {/* Assignments Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredAssignments.map((assignment) => (
-          <div key={assignment.id} className="card hover:shadow-md transition-shadow">
+          <div key={assignment._id} className="card hover:shadow-md transition-shadow">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                  {assignment.title}
-                </h3>
-                <p className="text-sm text-gray-600 mb-3 line-clamp-3">
-                  {assignment.description}
-                </p>
+                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{assignment.title}</h3>
+                <p className="text-sm text-gray-600 mb-3 line-clamp-3">{assignment.description}</p>
               </div>
-              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(assignment.status)}`}>
-                {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${new Date(assignment.dueDate) < new Date() ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                {new Date(assignment.dueDate) < new Date() ? 'Overdue' : 'Active'}
               </span>
             </div>
 
@@ -228,7 +231,7 @@ const AssignmentManagement: React.FC = () => {
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center text-gray-600">
                   <Users className="h-4 w-4 mr-1" />
-                  <span>Class {assignment.classId}</span>
+                  <span>Class {assignment.class}</span>
                 </div>
                 <div className="flex items-center text-gray-600">
                   <FileText className="h-4 w-4 mr-1" />
@@ -241,32 +244,31 @@ const AssignmentManagement: React.FC = () => {
                   <Calendar className="h-4 w-4 mr-1" />
                   <span>Due: {new Date(assignment.dueDate).toLocaleDateString()}</span>
                 </div>
-                <div className={`flex items-center ${isOverdue(assignment.dueDate) && assignment.status === 'active' ? 'text-red-600' : 'text-gray-600'}`}>
+                <div className={`flex items-center ${new Date(assignment.dueDate) < new Date() ? 'text-red-600' : 'text-gray-600'}`}>
                   <Clock className="h-4 w-4 mr-1" />
                   <span>
-                    {isOverdue(assignment.dueDate) && assignment.status === 'active' ? 'Overdue' : 
-                     Math.ceil((new Date(assignment.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) + ' days left'}
+                    {new Date(assignment.dueDate) < new Date()
+                      ? 'Overdue'
+                      : Math.ceil((new Date(assignment.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) + ' days left'}
                   </span>
                 </div>
               </div>
 
-              {/* Submission Progress */}
               <div>
                 <div className="flex items-center justify-between text-sm mb-1">
                   <span className="text-gray-600">Submissions</span>
                   <span className="font-medium">
-                    {assignment.submissions}/{assignment.totalStudents} ({getSubmissionRate(assignment.submissions, assignment.totalStudents)}%)
+                    0/0 (0%)
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${getSubmissionRate(assignment.submissions, assignment.totalStudents)}%` }}
+                    style={{ width: '0%' }}
                   />
                 </div>
               </div>
 
-              {/* Attachments */}
               {assignment.attachments && assignment.attachments.length > 0 && (
                 <div className="flex items-center text-sm text-gray-600">
                   <Upload className="h-4 w-4 mr-1" />
@@ -275,25 +277,15 @@ const AssignmentManagement: React.FC = () => {
               )}
             </div>
 
-            {/* Actions */}
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
               <div className="flex space-x-2">
-                <button
-                  className="text-primary-600 hover:text-primary-800 p-1"
-                  title="View Details"
-                >
+                <button className="text-primary-600 hover:text-primary-800 p-1" title="View Details">
                   <Eye className="h-4 w-4" />
                 </button>
-                <button
-                  className="text-gray-600 hover:text-gray-800 p-1"
-                  title="Edit Assignment"
-                >
+                <button className="text-gray-600 hover:text-gray-800 p-1" title="Edit Assignment">
                   <Edit className="h-4 w-4" />
                 </button>
-                <button
-                  className="text-red-600 hover:text-red-800 p-1"
-                  title="Delete Assignment"
-                >
+                <button className="text-red-600 hover:text-red-800 p-1" title="Delete Assignment">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -311,20 +303,24 @@ const AssignmentManagement: React.FC = () => {
           <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Assignments Found</h3>
           <p className="text-gray-600 mb-4">
-            {searchTerm || selectedClass || statusFilter !== 'all' 
-              ? 'No assignments match your current filters.' 
-              : 'You haven\'t created any assignments yet.'}
+            {searchTerm || selectedClass || statusFilter !== 'all'
+              ? 'No assignments match your current filters.'
+              : "You haven't created any assignments yet."}
           </p>
           {!searchTerm && !selectedClass && statusFilter === 'all' && (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary"
-            >
+            <button onClick={() => setShowCreateModal(true)} className="btn-primary">
               Create Your First Assignment
             </button>
           )}
         </div>
       )}
+
+      {/* Create Assignment Modal */}
+      <CreateAssignmentModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreateAssignment}
+      />
     </div>
   );
 };

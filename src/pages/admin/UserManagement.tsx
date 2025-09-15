@@ -2,9 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   Users, 
-  Plus, 
   Search, 
-  Filter, 
   Edit, 
   Trash2, 
   Eye,
@@ -12,29 +10,31 @@ import {
   Download,
   Upload
 } from 'lucide-react';
-import { RootState, AppDispatch } from '../../store';
-import { fetchUsers, createUser, updateUser, deleteUser } from '../../store/slices/userSlice';
-import { User } from '../../types';
+
+import { fetchUsers, deleteUser } from '../../store/slices/userSlice';
 import toast from 'react-hot-toast';
+import type { AppDispatch, RootState } from '../../store';
+import type { User } from '../../types';
 
 const UserManagement: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { users, students, teachers, parents, isLoading } = useSelector((state: RootState) => state.user);
-  
+  const { users, students, teachers, parents, isLoading } = useSelector(
+    (state: RootState) => state.user
+  );
+
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     dispatch(fetchUsers());
   }, [dispatch]);
 
   const filteredUsers = users.filter(user => {
-    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const fullName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+    const matchesRole = selectedRole === 'all' || (user.role ?? '') === selectedRole;
+    const matchesSearch =
+      fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     return matchesRole && matchesSearch;
   });
 
@@ -43,15 +43,18 @@ const UserManagement: React.FC = () => {
       try {
         await dispatch(deleteUser(userId)).unwrap();
         toast.success('User deleted successfully');
-      } catch (error) {
-        toast.error('Failed to delete user');
+      } catch (error: unknown) {
+        let errorMessage = 'Failed to delete user';
+        if (error && typeof error === 'object' && 'message' in error) {
+          errorMessage = `Failed to delete user: ${(error as { message?: string }).message}`;
+        }
+        toast.error(errorMessage);
       }
     }
   };
 
   const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setShowEditModal(true);
+    void user; // placeholder for edit logic
   };
 
   const getRoleColor = (role: string) => {
@@ -86,7 +89,6 @@ const UserManagement: React.FC = () => {
           <p className="text-gray-600">Manage all users in the system</p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
           className="btn-primary flex items-center space-x-2"
         >
           <UserPlus className="h-5 w-5" />
@@ -160,24 +162,12 @@ const UserManagement: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contact
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Joined
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -191,70 +181,60 @@ const UserManagement: React.FC = () => {
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                    No users found
-                  </td>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">No users found</td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                            <span className="text-primary-600 font-medium">
-                              {user.name.charAt(0).toUpperCase()}
-                            </span>
+                filteredUsers.map(user => {
+                  const fullName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+                  const initial = fullName ? fullName.charAt(0).toUpperCase() : '';
+                  const role = user.role ?? '';
+                  const formattedRole = role ? role.charAt(0).toUpperCase() + role.slice(1) : 'N/A';
+
+                  return (
+                    <tr key={user.id ?? user._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                              <span className="text-primary-600 font-medium">{initial}</span>
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{fullName || 'N/A'}</div>
+                            <div className="text-sm text-gray-500">{user.email || 'N/A'}</div>
                           </div>
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(role)}`}>
+                          {formattedRole}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.phone || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(user.isActive ?? false)}`}>
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end space-x-2">
+                          <button onClick={() => handleEditUser(user)} className="text-primary-600 hover:text-primary-900" title="Edit">
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button className="text-gray-600 hover:text-gray-900" title="View">
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => handleDeleteUser(user.id ?? user._id)} className="text-red-600 hover:text-red-900" title="Delete">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
-                        {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {user.phone || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(user.isActive)}`}>
-                        {user.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.joiningDate ? new Date(user.joiningDate).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() => handleEditUser(user)}
-                          className="text-primary-600 hover:text-primary-900"
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          className="text-gray-600 hover:text-gray-900"
-                          title="View"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -265,19 +245,12 @@ const UserManagement: React.FC = () => {
       <div className="card">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-700">
-            Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredUsers.length}</span> of{' '}
-            <span className="font-medium">{filteredUsers.length}</span> results
+            Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredUsers.length}</span> of <span className="font-medium">{filteredUsers.length}</span> results
           </div>
           <div className="flex items-center space-x-2">
-            <button className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700">
-              Previous
-            </button>
-            <button className="px-3 py-1 bg-primary-600 text-white rounded-md text-sm font-medium">
-              1
-            </button>
-            <button className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700">
-              Next
-            </button>
+            <button className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700">Previous</button>
+            <button className="px-3 py-1 bg-primary-600 text-white rounded-md text-sm font-medium">1</button>
+            <button className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700">Next</button>
           </div>
         </div>
       </div>
