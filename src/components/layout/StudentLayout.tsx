@@ -11,13 +11,22 @@ import {
   Home,
   GraduationCap,
   ClipboardList,
-  Bell
+  Bell,
+  Calendar,
+  DollarSign,
+  FileCheck,
+  Award,
+  Bookmark,
+  MessageSquare,
+  Bus,
+  Bed
 } from 'lucide-react';
 import type { RootState } from '../../store';
 import type { AppDispatch } from '../../store';
 import { logoutUser } from '../../store/slices/authSlice';
 import ProfileDropdown from '../common/ProfileDropdown';
 import toast from 'react-hot-toast';
+import { routes } from '../../routes';
 
 const StudentLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,19 +35,29 @@ const StudentLayout: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
 
-  const menuItems = [
-    { path: '/student/dashboard', icon: Home, label: 'Dashboard' },
-    { path: '/student/classes', icon: GraduationCap, label: 'Classes' },
-    { path: '/student/subjects', icon: BookOpen, label: 'Subjects' },
-    { path: '/student/assignments', icon: FileText, label: 'Assignments' },
-    { path: '/student/attendance', icon: ClipboardList, label: 'Attendance' },
-    { path: '/student/grades', icon: FileText, label: 'Grades' },
-    { path: '/student/profile', icon: Settings, label: 'Profile' },
-  ];
+const menuItems = [
+  { path: routes.student.dashboard, icon: Home, label: 'Dashboard' },
+  { path: routes.student.classes, icon: GraduationCap, label: 'Classes' },
+  { path: routes.student.subjects, icon: BookOpen, label: 'Subjects' },
+  { path: routes.student.classRoutine, icon: Calendar, label: 'Class Routine' },
+  { path: routes.student.assignments, icon: FileText, label: 'Assignments' },
+  { path: routes.student.attendance, icon: ClipboardList, label: 'Attendance' },
+  { path: routes.student.fees, icon: DollarSign, label: 'Fees & Payments' },
+  { path: routes.student.exams, icon: FileCheck, label: 'Exam Schedule' },
+  { path: routes.student.results, icon: Award, label: 'Results' },
+  { path: routes.student.notices, icon: Bell, label: 'Notices' },
+  { path: routes.student.events, icon: Calendar, label: 'Events & Holidays' },
+  { path: routes.student.library, icon: Bookmark, label: 'Library' },
+  { path: routes.student.resources, icon: BookOpen, label: 'Resources' },
+  { path: routes.student.communication, icon: MessageSquare, label: 'Communication' },
+  { path: routes.student.transport, icon: Bus, label: 'Transport' },
+  { path: routes.student.hostel, icon: Bed, label: 'Hostel' },
+  { path: routes.student.profile, icon: Settings, label: 'Profile' },
+];
 
   const handleLogout = async () => {
     try {
-      await dispatch(logoutUser()).unwrap();
+      await logoutUser(dispatch);
       toast.success('Logged out successfully');
       navigate('/login');
     } catch {
@@ -47,9 +66,9 @@ const StudentLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen overflow-hidden bg-gray-50 flex">
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex h-screen flex-col`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
@@ -92,7 +111,7 @@ const StudentLayout: React.FC = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -128,9 +147,9 @@ const StudentLayout: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-0">
+      <div className="flex-1 lg:ml-0 flex flex-col h-screen">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-gray-200">
           <div className="flex items-center justify-between h-16 px-6">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -155,7 +174,7 @@ const StudentLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
       </div>
