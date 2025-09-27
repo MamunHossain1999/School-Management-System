@@ -2,7 +2,9 @@ import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useLocation } from 'react-router-dom';
 import { type RootState, type AppDispatch } from '../../store';
-import { verifyToken } from '../../store/slices/authSlice';
+import { getProfile } from '../../store/slices/authSlice';
+import { useGetProfileQuery } from '../../store/api/authApi';
+
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,13 +16,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   const location = useLocation();
   const { isAuthenticated, user, isLoading, token } = useSelector((state: RootState) => state.auth);
 
+  // If we have a token but no user loaded yet, attempt to fetch profile via RTK Query
+  const shouldFetchProfile = Boolean(token) && !user;
+  const { isFetching: fetchingProfile } = useGetProfileQuery(undefined as void | undefined, { skip: !shouldFetchProfile });
+
   useEffect(() => {
     if (token && !user) {
-      dispatch(verifyToken());
+      // Fetch user profile to restore session when token exists
+      void getProfile(dispatch);
     }
   }, [dispatch, token, user]);
 
-  if (isLoading) {
+  if (isLoading || fetchingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
