@@ -45,11 +45,11 @@ const Register: React.FC = () => {
 
   const onSubmit = async (data: RegisterData) => {
     try {
-      await dispatch(registerUser(data)).unwrap();
+      await registerUser(data as any, dispatch);
       toast.success('Registration successful! Please login.');
       navigate('/login');
     } catch (error: any) {
-      toast.error(error);
+      toast.error(error?.message || 'Registration failed');
     }
   };
 
