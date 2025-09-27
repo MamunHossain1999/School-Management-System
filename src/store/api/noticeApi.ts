@@ -1,5 +1,4 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { RootState } from '../index';
+import { baseApi } from './baseApi';
 
 export interface Notice {
   _id: string;
@@ -23,7 +22,6 @@ export interface Message {
   sender: string;
   receiver: string;
   subject: string;
-  content: string;
   isRead: boolean;
   sentAt: string;
   attachments?: string[];
@@ -35,12 +33,28 @@ export interface CreateNoticeRequest {
   type: 'general' | 'urgent' | 'event' | 'holiday' | 'exam';
   targetAudience: 'all' | 'students' | 'teachers' | 'parents' | 'staff';
   class?: string;
-  section?: string;
   publishDate: string;
   expiryDate?: string;
   attachments?: string[];
 }
+// Payload for updating a notice: allow partial fields plus optional isActive toggle
+export interface UpdateNoticeRequest extends Partial<CreateNoticeRequest> {
+  isActive?: boolean;
+}
 
+// Extra responses for additional notice endpoints
+export interface NoticeStatsResponse {
+  total: number;
+  active: number;
+  inactive: number;
+  expiringSoon?: number;
+}
+
+export interface NoticePriorityItem {
+  _id: string;
+  title: string;
+  priority: number;
+}
 export interface SendMessageRequest {
   receiverId: string;
   subject: string;
@@ -48,24 +62,12 @@ export interface SendMessageRequest {
   attachments?: string[];
 }
 
-export const noticeApi = createApi({
-  reducerPath: 'noticeApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: `${import.meta.env.VITE_API_BASE_URL}/api`,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.token;
-      if (token) {
-        headers.set('authorization', `Bearer ${token}`);
-      }
-      return headers;
-    },
-  }),
-  tagTypes: ['Notice', 'Message'],
+export const noticeApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Notice management
     createNotice: builder.mutation<Notice, CreateNoticeRequest>({
       query: (noticeData) => ({
-        url: '/notices',
+        url: '/api/notices',
         method: 'POST',
         body: noticeData,
       }),
@@ -74,29 +76,50 @@ export const noticeApi = createApi({
 
     getNotices: builder.query<Notice[], { targetAudience?: string; type?: string; isActive?: boolean }>({
       query: (params) => ({
-        url: '/notices',
+        url: '/api/notices',
         params,
       }),
       providesTags: ['Notice'],
     }),
 
     getNoticeById: builder.query<Notice, string>({
-      query: (id) => `/notices/${id}`,
+      query: (id) => `/api/notices/${id}`,
       providesTags: ['Notice'],
     }),
 
-    updateNotice: builder.mutation<Notice, { id: string; data: Partial<CreateNoticeRequest> }>({
+    updateNotice: builder.mutation<Notice, { id: string; data: UpdateNoticeRequest }>({
       query: ({ id, data }) => ({
-        url: `/notices/${id}`,
+        url: `/api/notices/${id}`,
         method: 'PUT',
         body: data,
       }),
       invalidatesTags: ['Notice'],
     }),
 
+    // Stats for notices
+    getNoticeStats: builder.query<NoticeStatsResponse, void>({
+      query: () => '/api/notices/stats',
+      providesTags: ['Notice'],
+    }),
+
+    // Priority list
+    getNoticePriority: builder.query<NoticePriorityItem[], void>({
+      query: () => '/api/notices/priority',
+      providesTags: ['Notice'],
+    }),
+
+    // Mark a notice as viewed
+    markNoticeViewed: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/api/notices/${id}/view`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Notice'],
+    }),
+
     deleteNotice: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/notices/${id}`,
+        url: `/api/notices/${id}`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Notice'],
@@ -105,7 +128,7 @@ export const noticeApi = createApi({
     // Message management
     sendMessage: builder.mutation<Message, SendMessageRequest>({
       query: (messageData) => ({
-        url: '/messages/send',
+        url: '/api/communication/messages/send',
         method: 'POST',
         body: messageData,
       }),
@@ -114,7 +137,7 @@ export const noticeApi = createApi({
 
     getMessages: builder.query<Message[], { type?: 'sent' | 'received' }>({
       query: (params) => ({
-        url: '/messages',
+        url: '/api/communication/messages',
         params,
       }),
       providesTags: ['Message'],
@@ -122,7 +145,7 @@ export const noticeApi = createApi({
 
     markMessageAsRead: builder.mutation<Message, string>({
       query: (messageId) => ({
-        url: `/messages/${messageId}/read`,
+        url: `/api/communication/messages/${messageId}/read`,
         method: 'PUT',
       }),
       invalidatesTags: ['Message'],
@@ -130,14 +153,14 @@ export const noticeApi = createApi({
 
     deleteMessage: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/messages/${id}`,
+        url: `/api/communication/messages/${id}`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Message'],
     }),
 
     getUnreadMessageCount: builder.query<{ count: number }, void>({
-      query: () => '/messages/unread-count',
+      query: () => '/api/communication/messages/unread-count',
       providesTags: ['Message'],
     }),
   }),
@@ -148,6 +171,9 @@ export const {
   useGetNoticesQuery,
   useGetNoticeByIdQuery,
   useUpdateNoticeMutation,
+  useGetNoticeStatsQuery,
+  useGetNoticePriorityQuery,
+  useMarkNoticeViewedMutation,
   useDeleteNoticeMutation,
   useSendMessageMutation,
   useGetMessagesQuery,

@@ -10,13 +10,20 @@ import {
   X,
   Home,
   ClipboardList,
-  Bell
+  Bell,
+  Calendar,
+  Award,
+  Bookmark,
+  MessageSquare,
+  BarChart3
 } from 'lucide-react';
 import type { RootState } from '../../store';
 import type { AppDispatch } from '../../store';
 import { logoutUser } from '../../store/slices/authSlice';
 import ProfileDropdown from '../common/ProfileDropdown';
 import toast from 'react-hot-toast';
+import { useGetUnreadMessageCountQuery } from '../../store/api/noticeApi';
+import { routes } from '../../routes';
 
 const TeacherLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -24,20 +31,30 @@ const TeacherLayout: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { data: unreadData } = useGetUnreadMessageCountQuery();
+  const unreadCount = typeof unreadData?.count === 'number' ? unreadData.count : 0;
 
   const menuItems = [
-    { path: '/teacher/dashboard', icon: Home, label: 'Dashboard' },
-    { path: '/teacher/classes', icon: BookOpen, label: 'Classes' },
-    { path: '/teacher/subjects', icon: BookOpen, label: 'Subjects' },
-    { path: '/teacher/assignments', icon: FileText, label: 'Assignments' },
-    { path: '/teacher/attendance', icon: ClipboardList, label: 'Attendance' },
-    { path: '/teacher/grades', icon: FileText, label: 'Grades' },
-    { path: '/teacher/profile', icon: Settings, label: 'Profile' },
+    { path: routes.teacher.dashboard, icon: Home, label: 'Dashboard' },
+    { path: routes.teacher.classes, icon: BookOpen, label: 'Classes' },
+    { path: routes.teacher.subjects, icon: BookOpen, label: 'Subjects' },
+    { path: routes.teacher.syllabusResources, icon: Bookmark, label: 'Syllabus & Resources' },
+    { path: routes.teacher.assignments, icon: FileText, label: 'Assignments' },
+    { path: routes.teacher.attendance, icon: ClipboardList, label: 'Attendance' },
+    { path: routes.teacher.exams, icon: Calendar, label: 'Exams' },
+    { path: routes.teacher.resultEntry, icon: Award, label: 'Result Entry' },
+    { path: routes.teacher.grades, icon: FileText, label: 'Grades' },
+    { path: routes.teacher.reports, icon: BarChart3, label: 'Reports' },
+    { path: routes.teacher.notices, icon: Bell, label: 'Notices' },
+    { path: routes.teacher.events, icon: Calendar, label: 'Events' },
+    { path: routes.teacher.communication ?? '/teacher/communication', icon: MessageSquare, label: 'Communication' },
+    { path: routes.teacher.library, icon: Bookmark, label: 'Library' },
+    { path: routes.teacher.profile, icon: Settings, label: 'Profile' },
   ];
 
   const handleLogout = async () => {
     try {
-      await dispatch(logoutUser()).unwrap();
+      await logoutUser(dispatch);
       toast.success('Logged out successfully');
       navigate('/login');
     } catch {
@@ -46,9 +63,9 @@ const TeacherLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen overflow-hidden bg-gray-50 flex">
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex h-screen flex-col`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-green-600 to-blue-600 rounded-lg flex items-center justify-center">
@@ -91,7 +108,7 @@ const TeacherLayout: React.FC = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -127,9 +144,9 @@ const TeacherLayout: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-0">
+      <div className="flex-1 lg:ml-0 flex flex-col h-screen">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-gray-200">
           <div className="flex items-center justify-between h-16 px-6">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -145,8 +162,13 @@ const TeacherLayout: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100">
+              <button className="relative p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100">
                 <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] leading-none font-semibold rounded-full bg-red-500 text-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </button>
               <ProfileDropdown colorScheme="green" />
             </div>
@@ -154,7 +176,7 @@ const TeacherLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
       </div>

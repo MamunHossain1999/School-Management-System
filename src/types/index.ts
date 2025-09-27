@@ -1,19 +1,43 @@
+// src/types/index.ts বা যেখানেই তোমার টাইপস আছে
 export interface User {
   _id: string;
   id?: string;
+
+  // Basic info
   email: string;
-  name: string;
-  firstName: string;
-  lastName: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+
+  // Role
   role: 'admin' | 'teacher' | 'student' | 'parent';
+
+  // Optional fields
   avatar?: string;
+  profilePicture?: string; // align with API responses and UI
   phone?: string;
   address?: string;
   dateOfBirth?: string;
   joiningDate?: string;
+
+  // Student-specific fields
+  studentId?: string;
+  class?: string;
+  section?: string;
+  rollNumber?: string;
+  classId?: string;
+  sectionId?: string;
+  parentId?: string;
+  parent?: string;
+  admissionDate?: string;
+  bloodGroup?: string;
+  emergencyContact?: string;
+
+  // Status fields
   isActive: boolean;
-  createdAt: string
+  createdAt: string;
 }
+
 
 export interface Student extends User {
   role: 'student';
@@ -206,5 +230,23 @@ export interface RegisterData extends Omit<User, 'id' | 'isActive'> {
   // Admin-specific fields
   permissions?: string[];
   department?: string;
+}
+
+export interface UpdateProfileData {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: string;
+  // Student-specific fields
+  studentId?: string;
+  class?: string;
+  section?: string;
+  rollNumber?: string;
+}
+
+export interface ChangePasswordData {
+  currentPassword: string;
+  newPassword: string;
 }
 

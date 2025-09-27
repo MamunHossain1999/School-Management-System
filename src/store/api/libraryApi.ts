@@ -1,5 +1,4 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { RootState } from '../index';
+import { baseApi } from './baseApi';
 
 export interface Book {
   _id: string;
@@ -7,11 +6,21 @@ export interface Book {
   author: string;
   isbn: string;
   category: string;
+  publisher?: string;
   totalCopies: number;
   availableCopies: number;
   location: string;
+  shelfNumber?: string;
   description?: string;
   publishedYear?: number;
+  language: string;
+  pages?: number;
+  price?: number;
+  condition: 'new' | 'good' | 'fair' | 'poor';
+  coverImage?: string;
+  tags?: string[];
+  isActive: boolean;
+  createdBy: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,12 +28,18 @@ export interface Book {
 export interface BorrowRecord {
   _id: string;
   book: string | Book;
-  student: string;
+  borrower: string; // Can be student, teacher, or staff
+  borrowerType: 'student' | 'teacher' | 'staff';
   borrowDate: string;
   dueDate: string;
   returnDate?: string;
-  status: 'borrowed' | 'returned' | 'overdue';
+  status: 'borrowed' | 'returned' | 'overdue' | 'renewed';
+  renewalCount: number;
   fine?: number;
+  fineStatus: 'none' | 'pending' | 'paid';
+  notes?: string;
+  issuedBy: string;
+  returnedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,130 +49,406 @@ export interface CreateBookRequest {
   author: string;
   isbn: string;
   category: string;
+  publisher?: string;
   totalCopies: number;
   location: string;
+  shelfNumber?: string;
   description?: string;
   publishedYear?: number;
+  language: string;
+  pages?: number;
+  price?: number;
+  condition: 'new' | 'good' | 'fair' | 'poor';
+  coverImage?: string;
+  tags?: string[];
+}
+
+export interface UpdateBookRequest extends Partial<CreateBookRequest> {
+  isActive?: boolean;
 }
 
 export interface BorrowBookRequest {
   bookId: string;
-  studentId: string;
+  borrowerId: string;
+  borrowerType: 'student' | 'teacher' | 'staff';
   dueDate: string;
+  notes?: string;
 }
 
-export const libraryApi = createApi({
-  reducerPath: 'libraryApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: `${import.meta.env.VITE_API_BASE_URL}/api/library`,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.token;
-      if (token) {
-        headers.set('authorization', `Bearer ${token}`);
-      }
-      return headers;
-    },
-  }),
-  tagTypes: ['Book', 'BorrowRecord'],
+export interface ReturnBookRequest {
+  fine?: number;
+  notes?: string;
+}
+
+export interface LibraryStats {
+  totalBooks: number;
+  availableBooks: number;
+  borrowedBooks: number;
+  overdueBooks: number;
+  totalMembers: number;
+  activeMembers: number;
+  categoriesCount: number;
+  monthlyBorrows: number;
+  popularBooks: Array<{
+    book: Book;
+    borrowCount: number;
+  }>;
+  categoryDistribution: Record<string, number>;
+  borrowTrends: Array<{
+    month: string;
+    borrows: number;
+    returns: number;
+  }>;
+}
+
+export interface LibraryMember {
+  _id: string;
+  memberId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  type: 'student' | 'teacher' | 'staff';
+  class?: string;
+  section?: string;
+  department?: string;
+  joinDate: string;
+  isActive: boolean;
+  maxBooksAllowed: number;
+  currentBooksCount: number;
+  totalFine: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const libraryApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    // Book management
+    // POST /api/library/books - Add book (Admin)
     createBook: builder.mutation<Book, CreateBookRequest>({
       query: (bookData) => ({
-        url: '/books',
+        url: '/api/library/books',
         method: 'POST',
         body: bookData,
       }),
-      invalidatesTags: ['Book'],
+      invalidatesTags: ['Book', 'Library'],
     }),
 
-    getBooks: builder.query<Book[], { category?: string; search?: string }>({
+    // GET /api/library/books - Get all books (Teacher/Admin)
+    getBooks: builder.query<Book[], { 
+      category?: string; 
+      search?: string; 
+      author?: string;
+      language?: string;
+      isActive?: boolean;
+      page?: number;
+      limit?: number;
+    }>({
       query: (params) => ({
-        url: '/books',
+        url: '/api/library/books',
         params,
       }),
       providesTags: ['Book'],
     }),
 
+    // GET /api/library/books/:id - Get book by ID
     getBookById: builder.query<Book, string>({
-      query: (id) => `/books/${id}`,
+      query: (id) => `/api/library/books/${id}`,
       providesTags: ['Book'],
     }),
 
-    updateBook: builder.mutation<Book, { id: string; data: Partial<CreateBookRequest> }>({
+    // PUT /api/library/books/:id - Update book (Admin)
+    updateBook: builder.mutation<Book, { id: string; data: UpdateBookRequest }>({
       query: ({ id, data }) => ({
-        url: `/books/${id}`,
+        url: `/api/library/books/${id}`,
         method: 'PUT',
         body: data,
       }),
-      invalidatesTags: ['Book'],
+      invalidatesTags: ['Book', 'Library'],
     }),
 
+    // DELETE /api/library/books/:id - Delete book (Admin)
     deleteBook: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/books/${id}`,
+        url: `/api/library/books/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Book'],
+      invalidatesTags: ['Book', 'Library'],
     }),
 
-    // Borrow/Return system
+    // POST /api/library/borrow - Borrow book (Teacher/Admin)
     borrowBook: builder.mutation<BorrowRecord, BorrowBookRequest>({
       query: (borrowData) => ({
-        url: '/borrow',
+        url: '/api/library/borrow',
         method: 'POST',
         body: borrowData,
       }),
-      invalidatesTags: ['BorrowRecord', 'Book'],
+      invalidatesTags: ['BorrowRecord', 'Book', 'Library'],
     }),
 
-    returnBook: builder.mutation<BorrowRecord, { recordId: string; fine?: number }>({
-      query: ({ recordId, fine }) => ({
-        url: `/return/${recordId}`,
+    // PUT /api/library/return/:borrowId - Return book (Teacher/Admin)
+    returnBook: builder.mutation<BorrowRecord, { borrowId: string; data: ReturnBookRequest }>({
+      query: ({ borrowId, data }) => ({
+        url: `/api/library/return/${borrowId}`,
         method: 'PUT',
-        body: { fine },
+        body: data,
       }),
-      invalidatesTags: ['BorrowRecord', 'Book'],
+      invalidatesTags: ['BorrowRecord', 'Book', 'Library'],
     }),
 
-    getBorrowRecords: builder.query<BorrowRecord[], { studentId?: string; status?: string }>({
+    // GET /api/library/borrowed - Get borrowed books (Teacher/Admin)
+    getBorrowedBooks: builder.query<BorrowRecord[], { 
+      borrowerId?: string; 
+      borrowerType?: string;
+      status?: string;
+      page?: number;
+      limit?: number;
+    }>({
       query: (params) => ({
-        url: '/borrow-records',
+        url: '/api/library/borrowed',
         params,
       }),
       providesTags: ['BorrowRecord'],
     }),
 
-    getStudentBorrowHistory: builder.query<BorrowRecord[], string>({
-      query: (studentId) => `/students/${studentId}/borrow-history`,
+    // GET /api/library/overdue - Get overdue books (Teacher/Admin)
+    getOverdueBooks: builder.query<BorrowRecord[], { 
+      borrowerType?: string;
+      page?: number;
+      limit?: number;
+    }>({
+      query: (params) => ({
+        url: '/api/library/overdue',
+        params,
+      }),
       providesTags: ['BorrowRecord'],
     }),
 
-    getOverdueBooks: builder.query<BorrowRecord[], void>({
-      query: () => '/overdue',
-      providesTags: ['BorrowRecord'],
+    // GET /api/library/stats - Get library statistics (Teacher/Admin)
+    getLibraryStats: builder.query<LibraryStats, { 
+      period?: 'week' | 'month' | 'year';
+      startDate?: string;
+      endDate?: string;
+    }>({
+      query: (params) => ({
+        url: '/api/library/stats',
+        params,
+      }),
+      providesTags: ['Library'],
     }),
 
-    renewBook: builder.mutation<BorrowRecord, { recordId: string; newDueDate: string }>({
-      query: ({ recordId, newDueDate }) => ({
-        url: `/renew/${recordId}`,
+    // Additional useful endpoints
+    // GET /api/library/categories - Get book categories
+    getBookCategories: builder.query<string[], void>({
+      query: () => '/api/library/categories',
+      providesTags: ['Book'],
+    }),
+
+    // GET /api/library/authors - Get authors list
+    getAuthors: builder.query<string[], { search?: string }>({
+      query: (params) => ({
+        url: '/api/library/authors',
+        params,
+      }),
+      providesTags: ['Book'],
+    }),
+
+    // GET /api/library/members - Get library members
+    getLibraryMembers: builder.query<LibraryMember[], { 
+      type?: string;
+      isActive?: boolean;
+      search?: string;
+      page?: number;
+      limit?: number;
+    }>({
+      query: (params) => ({
+        url: '/api/library/members',
+        params,
+      }),
+      providesTags: ['LibraryMember'],
+    }),
+
+    // POST /api/library/members - Add library member
+    addLibraryMember: builder.mutation<LibraryMember, {
+      memberId: string;
+      name: string;
+      email: string;
+      phone?: string;
+      type: 'student' | 'teacher' | 'staff';
+      class?: string;
+      section?: string;
+      department?: string;
+      maxBooksAllowed?: number;
+    }>({
+      query: (memberData) => ({
+        url: '/api/library/members',
+        method: 'POST',
+        body: memberData,
+      }),
+      invalidatesTags: ['LibraryMember'],
+    }),
+
+    // PUT /api/library/members/:id - Update library member
+    updateLibraryMember: builder.mutation<LibraryMember, { 
+      id: string; 
+      data: Partial<{
+        name: string;
+        email: string;
+        phone: string;
+        maxBooksAllowed: number;
+        isActive: boolean;
+      }>
+    }>({
+      query: ({ id, data }) => ({
+        url: `/api/library/members/${id}`,
         method: 'PUT',
-        body: { newDueDate },
+        body: data,
+      }),
+      invalidatesTags: ['LibraryMember'],
+    }),
+
+    // GET /api/library/members/:id/history - Get member borrow history
+    getMemberBorrowHistory: builder.query<BorrowRecord[], { 
+      memberId: string;
+      page?: number;
+      limit?: number;
+    }>({
+      query: ({ memberId, ...params }) => ({
+        url: `/api/library/members/${memberId}/history`,
+        params,
+      }),
+      providesTags: ['BorrowRecord'],
+    }),
+
+    // PUT /api/library/renew/:borrowId - Renew book
+    renewBook: builder.mutation<BorrowRecord, { 
+      borrowId: string; 
+      newDueDate: string;
+      notes?: string;
+    }>({
+      query: ({ borrowId, newDueDate, notes }) => ({
+        url: `/api/library/renew/${borrowId}`,
+        method: 'PUT',
+        body: { newDueDate, notes },
       }),
       invalidatesTags: ['BorrowRecord'],
+    }),
+
+    // POST /api/library/reserve - Reserve book
+    reserveBook: builder.mutation<{ success: boolean; message: string; reservationId: string }, {
+      bookId: string;
+      borrowerId: string;
+      borrowerType: 'student' | 'teacher' | 'staff';
+      notes?: string;
+    }>({
+      query: (reservationData) => ({
+        url: '/api/library/reserve',
+        method: 'POST',
+        body: reservationData,
+      }),
+      invalidatesTags: ['Book', 'Library'],
+    }),
+
+    // GET /api/library/reservations - Get reservations
+    getReservations: builder.query<Array<{
+      _id: string;
+      book: Book;
+      borrower: string;
+      borrowerType: string;
+      reservationDate: string;
+      status: 'active' | 'fulfilled' | 'cancelled';
+      notes?: string;
+    }>, { 
+      borrowerId?: string;
+      status?: string;
+      page?: number;
+      limit?: number;
+    }>({
+      query: (params) => ({
+        url: '/api/library/reservations',
+        params,
+      }),
+      providesTags: ['Library'],
+    }),
+
+    // PUT /api/library/fine/:borrowId - Pay fine
+    payFine: builder.mutation<BorrowRecord, { 
+      borrowId: string; 
+      amount: number;
+      paymentMethod: string;
+      transactionId?: string;
+    }>({
+      query: ({ borrowId, ...data }) => ({
+        url: `/api/library/fine/${borrowId}`,
+        method: 'PUT',
+        body: data,
+      }),
+      invalidatesTags: ['BorrowRecord', 'LibraryMember'],
+    }),
+
+    // GET /api/library/reports/popular - Get popular books report
+    getPopularBooksReport: builder.query<Array<{
+      book: Book;
+      borrowCount: number;
+      lastBorrowed: string;
+    }>, { 
+      period?: 'week' | 'month' | 'year';
+      limit?: number;
+    }>({
+      query: (params) => ({
+        url: '/api/library/reports/popular',
+        params,
+      }),
+      providesTags: ['Library'],
+    }),
+
+    // GET /api/library/reports/defaulters - Get defaulters report
+    getDefaultersReport: builder.query<Array<{
+      member: LibraryMember;
+      overdueBooks: BorrowRecord[];
+      totalFine: number;
+    }>, { 
+      minDays?: number;
+      page?: number;
+      limit?: number;
+    }>({
+      query: (params) => ({
+        url: '/api/library/reports/defaulters',
+        params,
+      }),
+      providesTags: ['BorrowRecord', 'LibraryMember'],
     }),
   }),
 });
 
 export const {
+  // Book Management
   useCreateBookMutation,
   useGetBooksQuery,
   useGetBookByIdQuery,
   useUpdateBookMutation,
   useDeleteBookMutation,
+  
+  // Borrow/Return System
   useBorrowBookMutation,
   useReturnBookMutation,
-  useGetBorrowRecordsQuery,
-  useGetStudentBorrowHistoryQuery,
+  useGetBorrowedBooksQuery,
   useGetOverdueBooksQuery,
   useRenewBookMutation,
+  
+  // Statistics & Reports
+  useGetLibraryStatsQuery,
+  useGetPopularBooksReportQuery,
+  useGetDefaultersReportQuery,
+  
+  // Members Management
+  useGetLibraryMembersQuery,
+  useAddLibraryMemberMutation,
+  useUpdateLibraryMemberMutation,
+  useGetMemberBorrowHistoryQuery,
+  
+  // Additional Features
+  useGetBookCategoriesQuery,
+  useGetAuthorsQuery,
+  useReserveBookMutation,
+  useGetReservationsQuery,
+  usePayFineMutation,
 } = libraryApi;

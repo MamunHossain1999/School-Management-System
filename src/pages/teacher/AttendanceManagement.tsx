@@ -1,34 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
-import { Users, Clock, Check, X, Download, Save } from 'lucide-react';
+import { Users, Clock, Check, X, Download, Save, Search } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useGetClassesQuery } from '../../store/api/academicApi';
-import { useMarkAttendanceMutation } from '../../store/api/attendanceApi';
+import { useGetClassesQuery, useGetSectionsQuery } from '../../store/api/academicApi';
+import { useGetStudentsQuery } from '../../store/api/studentApi';
+import { 
+  useMarkAttendanceMutation, 
+  useGetAttendanceRecordsQuery 
+} from '../../store/api/attendanceApi';
 
 interface StudentAttendance {
   id: string;
   name: string;
   rollNumber: string;
   status: 'present' | 'absent' | 'late' | 'excused';
+  remarks?: string;
 }
 
-// Mock student data
-const mockStudents: StudentAttendance[] = [
-  { id: '1', name: 'John Smith', rollNumber: '001', status: 'present' },
-  { id: '2', name: 'Emma Johnson', rollNumber: '002', status: 'present' },
-  { id: '3', name: 'Michael Brown', rollNumber: '003', status: 'absent' },
-  { id: '4', name: 'Sarah Davis', rollNumber: '004', status: 'present' },
-  { id: '5', name: 'David Wilson', rollNumber: '005', status: 'late' },
-  { id: '6', name: 'Lisa Anderson', rollNumber: '006', status: 'present' },
-  { id: '7', name: 'James Taylor', rollNumber: '007', status: 'present' },
-  { id: '8', name: 'Maria Garcia', rollNumber: '008', status: 'excused' },
-  { id: '9', name: 'Robert Martinez', rollNumber: '009', status: 'present' },
-  { id: '10', name: 'Jennifer Lee', rollNumber: '010', status: 'present' },
-];
-
 const AttendanceManagement: React.FC = () => {
-  // const { user } = useSelector((state: RootState) => state.auth);
   const { data: classes, isLoading: isClassesLoading } = useGetClassesQuery();
+  const { data: sections } = useGetSectionsQuery();
   const [markAttendance] = useMarkAttendanceMutation();
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -36,14 +27,50 @@ const AttendanceManagement: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('');
   const [students, setStudents] = useState<StudentAttendance[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Get students for selected class and section
+  const { data: studentsResponse, isLoading: isStudentsLoading } = useGetStudentsQuery(
+    selectedClass && selectedSection ? { class: selectedClass, section: selectedSection } : undefined,
+    { skip: !selectedClass || !selectedSection }
+  );
+
+  // Get existing attendance for the selected date
+  const { data: existingAttendance } = useGetAttendanceRecordsQuery(
+    selectedClass && selectedSection && selectedDate 
+      ? { classId: selectedClass, sectionId: selectedSection, date: selectedDate }
+      : undefined,
+    { skip: !selectedClass || !selectedSection || !selectedDate }
+  );
 
   useEffect(() => {
-    if (selectedClass && selectedSection) {
-      setStudents(mockStudents);
+    if (studentsResponse?.students && Array.isArray(studentsResponse.students)) {
+      const attendanceMap = new Map();
+      if (existingAttendance && Array.isArray(existingAttendance)) {
+        existingAttendance.forEach((record: any) => {
+          attendanceMap.set(record.student._id || record.student, {
+            status: record.status,
+            remarks: record.remarks
+          });
+        });
+      }
+
+      const studentList: StudentAttendance[] = studentsResponse.students.map((student: any) => {
+        const existingRecord = attendanceMap.get(student._id);
+        return {
+          id: student._id,
+          name: student.name || `${student.firstName} ${student.lastName}`,
+          rollNumber: student.rollNumber || student.studentId || 'N/A',
+          status: existingRecord?.status || 'present',
+          remarks: existingRecord?.remarks || ''
+        };
+      });
+
+      setStudents(studentList);
     } else {
       setStudents([]);
     }
-  }, [selectedClass, selectedSection]);
+  }, [studentsResponse, existingAttendance]);
 
   const handleStatusChange = (studentId: string, status: StudentAttendance['status']) => {
     setStudents(prev =>
@@ -101,16 +128,22 @@ const AttendanceManagement: React.FC = () => {
     }
   };
 
+  // Filter students based on search term
+  const filteredStudents = students.filter(student =>
+    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const attendanceStats = {
-    present: students.filter(s => s.status === 'present').length,
-    absent: students.filter(s => s.status === 'absent').length,
-    late: students.filter(s => s.status === 'late').length,
-    excused: students.filter(s => s.status === 'excused').length,
-    total: students.length,
+    present: filteredStudents.filter(s => s.status === 'present').length,
+    absent: filteredStudents.filter(s => s.status === 'absent').length,
+    late: filteredStudents.filter(s => s.status === 'late').length,
+    excused: filteredStudents.filter(s => s.status === 'excused').length,
+    total: filteredStudents.length,
   };
 
-  const attendancePercentage = students.length > 0
-    ? Math.round((attendanceStats.present / students.length) * 100)
+  const attendancePercentage = filteredStudents.length > 0
+    ? Math.round((attendanceStats.present / filteredStudents.length) * 100)
     : 0;
 
   return (
@@ -160,18 +193,26 @@ const AttendanceManagement: React.FC = () => {
             disabled={!selectedClass}
           >
             <option value="">Select Section</option>
-            <option value="A">Section A</option>
-            <option value="B">Section B</option>
+            {Array.isArray(sections) && sections
+              .filter((section: any) => section.classId === selectedClass)
+              .map((section: any) => (
+                <option key={section._id} value={section.name}>
+                  Section {section.name}
+                </option>
+              ))}
           </select>
         </div>
         <div className="flex items-end">
-          <button
-            onClick={() => selectedClass && selectedSection && setStudents(mockStudents)}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            disabled={!selectedClass || !selectedSection}
-          >
-            Load Students
-          </button>
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search students..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
       </div>
 
@@ -202,7 +243,27 @@ const AttendanceManagement: React.FC = () => {
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-sm border space-y-3">
-            {students?.map(student => (
+            {isStudentsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="animate-pulse flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                      <div>
+                        <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded w-16"></div>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      {[1, 2, 3, 4].map((j) => (
+                        <div key={j} className="h-8 w-20 bg-gray-200 rounded"></div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              filteredStudents?.map(student => (
               <div key={student.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center space-x-4">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -230,7 +291,8 @@ const AttendanceManagement: React.FC = () => {
                   ))}
                 </div>
               </div>
-            ))}
+            ))
+            )}
             <div className="flex items-center justify-end mt-6 pt-4 border-t">
               <button
                 onClick={handleSubmitAttendance}

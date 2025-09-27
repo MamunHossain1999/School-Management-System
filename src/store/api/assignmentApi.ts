@@ -1,5 +1,4 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { RootState } from '../index';
+import { baseApi } from './baseApi';
 
 export interface Assignment {
   _id: string;
@@ -50,24 +49,12 @@ export interface GradeSubmissionRequest {
   feedback?: string;
 }
 
-export const assignmentApi = createApi({
-  reducerPath: 'assignmentApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: `${import.meta.env.VITE_API_BASE_URL}/api/assignments`,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.token;
-      if (token) {
-        headers.set('authorization', `Bearer ${token}`);
-      }
-      return headers;
-    },
-  }),
-  tagTypes: ['Assignment', 'Submission'],
+export const assignmentApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Assignment endpoints
     createAssignment: builder.mutation<Assignment, CreateAssignmentRequest>({
       query: (assignmentData) => ({
-        url: '/',
+        url: '/api/assignments',
         method: 'POST',
         body: assignmentData,
       }),
@@ -76,7 +63,7 @@ export const assignmentApi = createApi({
 
     getAssignments: builder.query<Assignment[], { class?: string; subject?: string }>({
       query: (params) => ({
-        url: '/',
+        url: '/api/assignments',
         params,
       }),
       providesTags: ['Assignment'],
@@ -84,7 +71,7 @@ export const assignmentApi = createApi({
 
     updateAssignment: builder.mutation<Assignment, { id: string; data: Partial<CreateAssignmentRequest> }>({
       query: ({ id, data }) => ({
-        url: `/${id}`,
+        url: `/api/assignments/${id}`,
         method: 'PUT',
         body: data,
       }),
@@ -93,21 +80,21 @@ export const assignmentApi = createApi({
 
     deleteAssignment: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/${id}`,
+        url: `/api/assignments/${id}`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Assignment'],
     }),
 
     getAssignmentSubmissions: builder.query<AssignmentSubmission[], string>({
-      query: (assignmentId) => `/${assignmentId}/submissions`,
+      query: (assignmentId) => `/api/assignments/${assignmentId}/submissions`,
       providesTags: ['Submission'],
     }),
 
     // Submission endpoints
     submitAssignment: builder.mutation<AssignmentSubmission, { assignmentId: string; data: SubmitAssignmentRequest }>({
       query: ({ assignmentId, data }) => ({
-        url: `/${assignmentId}/submit`,
+        url: `/api/assignments/${assignmentId}/submit`,
         method: 'POST',
         body: data,
       }),
@@ -116,7 +103,7 @@ export const assignmentApi = createApi({
 
     gradeSubmission: builder.mutation<AssignmentSubmission, { id: string; data: GradeSubmissionRequest }>({
       query: ({ id, data }) => ({
-        url: `/submissions/${id}/grade`,
+        url: `/api/assignments/submissions/${id}/grade`,
         method: 'PUT',
         body: data,
       }),
@@ -124,13 +111,13 @@ export const assignmentApi = createApi({
     }),
 
     getStudentSubmissions: builder.query<AssignmentSubmission[], void>({
-      query: () => '/submissions/my',
+      query: () => '/api/assignments/submissions/my',
       providesTags: ['Submission'],
     }),
 
     updateSubmission: builder.mutation<AssignmentSubmission, { id: string; data: Partial<SubmitAssignmentRequest> }>({
       query: ({ id, data }) => ({
-        url: `/submissions/${id}`,
+        url: `/api/assignments/submissions/${id}`,
         method: 'PUT',
         body: data,
       }),

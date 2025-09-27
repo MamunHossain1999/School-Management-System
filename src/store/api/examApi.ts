@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { RootState } from '../index';
+import { baseApi } from './baseApi';
 
 export interface Exam {
   _id: string;
@@ -84,19 +82,39 @@ export interface SubmitResultRequest {
   remarks?: string;
 }
 
-export const examApi = createApi({
-  reducerPath: 'examApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: `${import.meta.env.VITE_API_BASE_URL}/api`,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.token;
-      if (token) {
-        headers.set('authorization', `Bearer ${token}`);
-      }
-      return headers;
-    },
-  }),
-  tagTypes: ['Exam', 'Result', 'ReportCard'],
+export interface ExamAnalytics {
+  totalStudents: number;
+  appeared: number;
+  passed: number;
+  failed: number;
+  absent: number;
+  averageMarks: number;
+  highestMarks: number;
+  lowestMarks: number;
+  passPercentage: number;
+  gradeDistribution: {
+    grade: string;
+    count: number;
+    percentage: number;
+  }[];
+}
+
+export interface ClassPerformance {
+  classId: string;
+  className: string;
+  section: string;
+  totalStudents: number;
+  averageMarks: number;
+  passPercentage: number;
+  topPerformers: {
+    studentId: string;
+    studentName: string;
+    marksObtained: number;
+    percentage: number;
+  }[];
+}
+
+export const examApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Exam management
     createExam: builder.mutation<Exam, CreateExamRequest>({
@@ -138,68 +156,89 @@ export const examApi = createApi({
       invalidatesTags: ['Exam'],
     }),
 
-    // Result management
+    // Result management - POST /results
     submitResult: builder.mutation<Result, SubmitResultRequest>({
       query: (resultData) => ({
-        url: '/results',
+        url: '/exams/results',
         method: 'POST',
         body: resultData,
       }),
       invalidatesTags: ['Result'],
     }),
 
-    getResults: builder.query<Result[], { examId?: string; studentId?: string; classId?: string }>({
+    // GET /:examId/results - Get exam results
+    getExamResults: builder.query<Result[], string>({
+      query: (examId) => `/exams/${examId}/results`,
+      providesTags: ['Result'],
+    }),
+
+    // GET /students/me/results - Get own results (student/parent)
+    getMyResults: builder.query<Result[], { startDate?: string; endDate?: string } | void>({
       query: (params) => ({
-        url: '/results',
+        url: '/exams/students/me/results',
+        params: params || {},
+      }),
+      providesTags: ['Result'],
+    }),
+
+    // GET /students/:studentId/results - Get student results
+    getStudentResults: builder.query<Result[], string>({
+      query: (studentId) => `/exams/students/${studentId}/results`,
+      providesTags: ['Result'],
+    }),
+
+    // GET /results - Get all results (for teachers/admin)
+    getResults: builder.query<Result[], { classId?: string; subjectId?: string; examId?: string }>({
+      query: (params) => ({
+        url: '/exams/results',
         params,
       }),
       providesTags: ['Result'],
     }),
 
+    // Update result
     updateResult: builder.mutation<Result, { id: string; data: Partial<SubmitResultRequest> }>({
       query: ({ id, data }) => ({
-        url: `/results/${id}`,
+        url: `/exams/results/${id}`,
         method: 'PUT',
         body: data,
       }),
       invalidatesTags: ['Result'],
     }),
 
-    getStudentResults: builder.query<Result[], string>({
-      query: (studentId) => `/results/student/${studentId}`,
-      providesTags: ['Result'],
-    }),
-
-    // Report card management
+    // POST /report-card - Generate report card
     generateReportCard: builder.mutation<ReportCard, { studentId: string; term: string; academicYear: string }>({
       query: (data) => ({
-        url: '/report-cards/generate',
+        url: '/exams/report-card',
         method: 'POST',
         body: data,
       }),
       invalidatesTags: ['ReportCard'],
     }),
 
+    // Get report cards
     getReportCards: builder.query<ReportCard[], { studentId?: string; classId?: string; term?: string }>({
       query: (params) => ({
-        url: '/report-cards',
+        url: '/exams/report-cards',
         params,
       }),
       providesTags: ['ReportCard'],
     }),
 
     getReportCardById: builder.query<ReportCard, string>({
-      query: (id) => `/report-cards/${id}`,
+      query: (id) => `/exams/report-cards/${id}`,
       providesTags: ['ReportCard'],
     }),
 
     // Analytics and reports
-    getExamAnalytics: builder.query<any, string>({
+    getExamAnalytics: builder.query<ExamAnalytics, string>({
       query: (examId) => `/exams/${examId}/analytics`,
+      providesTags: ['Result'],
     }),
 
-    getClassPerformance: builder.query<any, { classId: string; examId: string }>({
-      query: ({ classId, examId }) => `/analytics/class/${classId}/exam/${examId}`,
+    getClassPerformance: builder.query<ClassPerformance, { classId: string; examId: string }>({
+      query: ({ classId, examId }) => `/exams/analytics/class/${classId}/exam/${examId}`,
+      providesTags: ['Result'],
     }),
   }),
 });
@@ -211,9 +250,11 @@ export const {
   useUpdateExamMutation,
   useDeleteExamMutation,
   useSubmitResultMutation,
+  useGetExamResultsQuery,
+  useGetMyResultsQuery,
+  useGetStudentResultsQuery,
   useGetResultsQuery,
   useUpdateResultMutation,
-  useGetStudentResultsQuery,
   useGenerateReportCardMutation,
   useGetReportCardsQuery,
   useGetReportCardByIdQuery,

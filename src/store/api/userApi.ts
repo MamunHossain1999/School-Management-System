@@ -1,202 +1,182 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { RootState } from '../index';
+import { baseApi } from './baseApi';
+import type { User, ApiResponse } from '../../types';
 
-export interface User {
-  _id: string;
-  id?: string;
-  firstName: string;
-  lastName: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: 'admin' | 'teacher' | 'student' | 'parent';
-  isActive: boolean;
-  avatar?: string;
-  profilePicture?: string;
-  address?: string;
-  dateOfBirth?: string;
-  joiningDate?: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export interface CreateUserRequest {
-  firstName: string;
-  lastName: string;
+// ---------- Types ----------
+export interface CreateUserPayload {
   email: string;
   password: string;
+  firstName: string;
+  lastName: string;
   phone?: string;
-  role: 'admin' | 'teacher' | 'student' | 'parent';
-  address?: string;
-  dateOfBirth?: string;
 }
 
-export interface UpdateUserRequest {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  dateOfBirth?: string;
-  profilePicture?: string;
+export interface CreateStudentPayload extends CreateUserPayload {
+  classId: string;
+  sectionId: string;
+  rollNumber: string;
 }
 
-export interface ChangePasswordRequest {
-  currentPassword: string;
-  newPassword: string;
+export interface ListUsersQuery {
+  role?: User['role'] | string;
+  isActive?: boolean;
+  page?: number;
+  limit?: number;
+  search?: string;
 }
 
-export const userApi = createApi({
-  reducerPath: 'userApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: `${import.meta.env.VITE_API_BASE_URL}/api/users`,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.token;
-      if (token) {
-        headers.set('authorization', `Bearer ${token}`);
-      }
-      return headers;
-    },
-  }),
-  tagTypes: ['User'],
+export interface Pagination {
+  currentPage: number;
+  totalPages: number;
+  total: number;
+}
+
+export interface ListUsersData {
+  users: User[];
+  pagination: Pagination;
+}
+
+export const userApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    // User management
-    createUser: builder.mutation<User, CreateUserRequest>({
-      query: (userData) => ({
-        url: '/',
+    // ------------------ Create Admin ------------------
+    createAdmin: builder.mutation<User, CreateUserPayload>({
+      query: (body) => ({
+        url: '/api/users/create/admin',
         method: 'POST',
-        body: userData,
+        body,
       }),
+      transformResponse: (response: ApiResponse<{ user: User } | User>) => {
+        const data = (response?.data as any)?.user ?? (response?.data as any);
+        return data as User;
+      },
+      invalidatesTags: ['User'],
+    }),
+    // ------------------ Create Teacher ------------------
+    createTeacher: builder.mutation<User, CreateUserPayload>({
+      query: (body) => ({
+        url: '/api/users/create/teacher',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (response: ApiResponse<{ user: User } | User>) => {
+        const data = (response?.data as any)?.user ?? (response?.data as any);
+        return data as User;
+      },
       invalidatesTags: ['User'],
     }),
 
-    getUsers: builder.query<User[], { role?: string; isActive?: boolean; search?: string }>({
-      query: (params) => ({
-        url: '/',
+    // ------------------ Create Student ------------------
+    createStudent: builder.mutation<User, CreateStudentPayload>({
+      query: (body) => ({
+        url: '/api/users/create/student',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (response: ApiResponse<{ user: User } | User>) => {
+        const data = (response?.data as any)?.user ?? (response?.data as any);
+        return data as User;
+      },
+      invalidatesTags: ['User'],
+    }),
+
+    // ------------------ Create User (generic role) ------------------
+    createUser: builder.mutation<User, CreateUserPayload & { role: string }>({
+      query: (body) => ({
+        url: '/api/users/create',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (response: ApiResponse<{ user: User } | User>) => {
+        const data = (response?.data as any)?.user ?? (response?.data as any);
+        return data as User;
+      },
+      invalidatesTags: ['User'],
+    }),
+
+    // ------------------ List Users ------------------
+    listUsers: builder.query<ListUsersData, ListUsersQuery | undefined>({
+      query: (params?: ListUsersQuery) => ({
+        url: '/api/users',
         params,
       }),
-      providesTags: ['User'],
+      transformResponse: (response: ApiResponse<ListUsersData>) => response.data,
+      providesTags: (result) =>
+        result?.users
+          ? [
+              ...result.users.map((u) => ({ type: 'User' as const, id: u._id || u.id })),
+              { type: 'User' as const, id: 'LIST' },
+            ]
+          : [{ type: 'User' as const, id: 'LIST' }],
     }),
 
+    // ------------------ Get User By ID ------------------
     getUserById: builder.query<User, string>({
-      query: (id) => `/${id}`,
-      providesTags: ['User'],
+      query: (id) => `/api/users/${id}`,
+      transformResponse: (response: ApiResponse<{ user: User } | User>) => {
+        const data = (response?.data as any)?.user ?? (response?.data as any);
+        return data as User;
+      },
+      providesTags: (_result, _error, id) => [{ type: 'User', id }],
     }),
 
-    updateUser: builder.mutation<User, { id: string; data: UpdateUserRequest }>({
-      query: ({ id, data }) => ({
-        url: `/${id}`,
+    // ------------------ Update User ------------------
+    updateUser: builder.mutation<User, { id: string; updates: Partial<User> & Record<string, unknown> }>({
+      query: ({ id, updates }) => ({
+        url: `/api/users/${id}`,
         method: 'PUT',
-        body: data,
+        body: updates,
       }),
-      invalidatesTags: ['User'],
+      transformResponse: (response: ApiResponse<{ user: User } | User>) => {
+        const data = (response?.data as any)?.user ?? (response?.data as any);
+        return data as User;
+      },
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'User', id },
+        { type: 'User', id: 'LIST' },
+      ],
     }),
 
-    deleteUser: builder.mutation<void, string>({
+    // ------------------ Deactivate User ------------------
+    deactivateUser: builder.mutation<User, string>({
       query: (id) => ({
-        url: `/${id}`,
-        method: 'DELETE',
+        url: `/api/users/${id}/deactivate`,
+        method: 'PATCH',
       }),
-      invalidatesTags: ['User'],
+      transformResponse: (response: ApiResponse<{ user: User } | User>) => {
+        const data = (response?.data as any)?.user ?? (response?.data as any);
+        return data as User;
+      },
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'User', id },
+        { type: 'User', id: 'LIST' },
+      ],
     }),
 
-    toggleUserActivation: builder.mutation<User, string>({
+    // ------------------ Activate User ------------------
+    activateUser: builder.mutation<User, string>({
       query: (id) => ({
-        url: `/${id}/toggle-activation`,
-        method: 'PUT',
+        url: `/api/users/${id}/activate`,
+        method: 'PATCH',
       }),
-      invalidatesTags: ['User'],
-    }),
-
-    changeUserRole: builder.mutation<User, { id: string; role: string }>({
-      query: ({ id, role }) => ({
-        url: `/${id}/role`,
-        method: 'PUT',
-        body: { role },
-      }),
-      invalidatesTags: ['User'],
-    }),
-
-    changePassword: builder.mutation<void, { id: string; data: ChangePasswordRequest }>({
-      query: ({ id, data }) => ({
-        url: `/${id}/change-password`,
-        method: 'PUT',
-        body: data,
-      }),
-    }),
-
-    resetPassword: builder.mutation<void, { id: string; newPassword: string }>({
-      query: ({ id, newPassword }) => ({
-        url: `/${id}/reset-password`,
-        method: 'PUT',
-        body: { newPassword },
-      }),
-    }),
-
-    uploadProfilePicture: builder.mutation<User, { id: string; formData: FormData }>({
-      query: ({ id, formData }) => ({
-        url: `/${id}/profile-picture`,
-        method: 'POST',
-        body: formData,
-      }),
-      invalidatesTags: ['User'],
-    }),
-
-    // Bulk operations
-    bulkCreateUsers: builder.mutation<User[], CreateUserRequest[]>({
-      query: (usersData) => ({
-        url: '/bulk',
-        method: 'POST',
-        body: { users: usersData },
-      }),
-      invalidatesTags: ['User'],
-    }),
-
-    bulkUpdateUsers: builder.mutation<User[], { ids: string[]; data: Partial<UpdateUserRequest> }>({
-      query: ({ ids, data }) => ({
-        url: '/bulk-update',
-        method: 'PUT',
-        body: { ids, data },
-      }),
-      invalidatesTags: ['User'],
-    }),
-
-    bulkDeleteUsers: builder.mutation<void, string[]>({
-      query: (ids) => ({
-        url: '/bulk-delete',
-        method: 'DELETE',
-        body: { ids },
-      }),
-      invalidatesTags: ['User'],
-    }),
-
-    // Analytics
-    getUserStats: builder.query<any, void>({
-      query: () => '/stats',
-    }),
-
-    getUsersByRole: builder.query<User[], string>({
-      query: (role) => `/?role=${role}`,
-      providesTags: ['User'],
+      transformResponse: (response: ApiResponse<{ user: User } | User>) => {
+        const data = (response?.data as any)?.user ?? (response?.data as any);
+        return data as User;
+      },
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'User', id },
+        { type: 'User', id: 'LIST' },
+      ],
     }),
   }),
 });
 
 export const {
-  useCreateUserMutation,
-  useGetUsersQuery,
+  useCreateTeacherMutation,
+  useCreateAdminMutation,
+  useCreateStudentMutation,
+  useListUsersQuery,
   useGetUserByIdQuery,
   useUpdateUserMutation,
-  useDeleteUserMutation,
-  useToggleUserActivationMutation,
-  useChangeUserRoleMutation,
-  useChangePasswordMutation,
-  useResetPasswordMutation,
-  useUploadProfilePictureMutation,
-  useBulkCreateUsersMutation,
-  useBulkUpdateUsersMutation,
-  useBulkDeleteUsersMutation,
-  useGetUserStatsQuery,
-  useGetUsersByRoleQuery,
+  useDeactivateUserMutation,
+  useActivateUserMutation,
 } = userApi;

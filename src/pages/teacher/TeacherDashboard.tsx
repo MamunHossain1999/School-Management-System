@@ -1,4 +1,5 @@
-import React from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { 
   Users, 
@@ -14,29 +15,47 @@ import {
 
 import type { RootState } from '../../store';
 import { useGetAssignmentsQuery } from '../../store/api/assignmentApi';
+import { useGetTeacherScheduleQuery } from '../../store/api/teacherApi';
 
 
 const TeacherDashboard: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
+  const teacherId = (user as any)?._id || (user as any)?.id || '';
   
   // Use RTK Query hooks to fetch data
-  const { data: assignments = [] } = useGetAssignmentsQuery(
-    {},
-    { skip: !user?.id }
-  );
+  const { data: assignments = [] } = useGetAssignmentsQuery({}, { skip: !teacherId });
+  const { data: scheduleData } = useGetTeacherScheduleQuery(teacherId, { skip: !teacherId });
+
+  const todayName = useMemo(() => {
+    return new Date().toLocaleDateString(undefined, { weekday: 'long' }).toLowerCase();
+  }, []);
+
+  // Normalize schedule array for today if API returns array of schedules
+  const todaySchedule = useMemo(() => {
+    const raw = Array.isArray(scheduleData) ? scheduleData : [];
+    // Expect items with shape { day: string, periods: [{ startTime, endTime, subject, class, section }] }
+    const forToday = raw.find((s: any) => (s?.day || '').toLowerCase() === todayName);
+    const periods = Array.isArray(forToday?.periods) ? forToday.periods : [];
+    return periods.map((p: any) => ({
+      time: `${p.startTime ?? ''} - ${p.endTime ?? ''}`.trim(),
+      subject: p.subject ?? 'N/A',
+      class: p.class && p.section ? `${p.class}-${p.section}` : (p.class ?? 'N/A'),
+      room: p.room ?? '—',
+    }));
+  }, [scheduleData, todayName]);
 
 
   const stats = [
     {
       title: 'My Students',
-      value: 85,
+      value: '—', // Requires a dedicated backend endpoint; can be added later
       icon: Users,
       color: 'bg-blue-500',
       description: 'Across all classes',
     },
     {
       title: 'Classes Today',
-      value: 6,
+      value: todaySchedule.length,
       icon: BookOpen,
       color: 'bg-green-500',
       description: 'Scheduled for today',
@@ -50,20 +69,15 @@ const TeacherDashboard: React.FC = () => {
     },
     {
       title: 'Attendance Rate',
-      value: '92%',
+      value: '—', // Hook up to attendance API analytics when available
       icon: ClipboardCheck,
       color: 'bg-orange-500',
       description: 'This week',
     },
   ];
 
-  const todaySchedule = [
-    { time: '09:00 AM', subject: 'Mathematics', class: 'Class 10-A', room: 'Room 101' },
-    { time: '10:30 AM', subject: 'Physics', class: 'Class 11-B', room: 'Lab 2' },
-    { time: '12:00 PM', subject: 'Mathematics', class: 'Class 9-C', room: 'Room 103' },
-    { time: '02:00 PM', subject: 'Physics', class: 'Class 12-A', room: 'Lab 1' },
-    { time: '03:30 PM', subject: 'Mathematics', class: 'Class 10-B', room: 'Room 102' },
-  ];
+  // recentActivities could be sourced from multiple APIs (assignments, attendance, exams, messages)
+  // For now, keep placeholders; can be wired to real data later.
 
   const recentActivities = [
     {

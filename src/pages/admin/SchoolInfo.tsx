@@ -37,7 +37,7 @@ const SchoolInfo: React.FC = () => {
     defaultValues: {
       name: 'Greenwood International School',
       address: '123 Education Street, Knowledge City, State 12345',
-      phone: '+1 (555) 123-4567',
+      phone: '+88 01795920956',
       email: 'info@greenwood.edu',
       website: 'www.greenwood.edu',
       establishedYear: '1995',

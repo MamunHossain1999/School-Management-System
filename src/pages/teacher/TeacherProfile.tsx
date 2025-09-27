@@ -1,46 +1,121 @@
-import React, { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useRef, useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { User, Mail, Phone, MapPin, Calendar, Edit2, Save, X, Camera, BookOpen, GraduationCap } from 'lucide-react';
 import type { RootState } from '../../store';
+import toast from 'react-hot-toast';
+import { useGetProfileQuery, useUpdateProfileMutation, useChangePasswordMutation, useUploadAvatarMutation } from '../../store/api/authApi';
 
 const TeacherProfile: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   const [isEditing, setIsEditing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // RTK Query hooks
+  const { data: profile, refetch } = useGetProfileQuery();
+  const [updateProfile, { isLoading: saving }] = useUpdateProfileMutation();
+  const [changePassword, { isLoading: changingPassword }] = useChangePasswordMutation();
+  const [uploadAvatar, { isLoading: uploadingAvatar }] = useUploadAvatarMutation();
+
   const [formData, setFormData] = useState({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    address: user?.address || '',
-    dateOfBirth: user?.dateOfBirth || '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
+    dateOfBirth: '',
     subject: '',
     qualification: '',
     experience: '',
   });
+
+  useEffect(() => {
+    const src = (profile || user || {}) as Partial<{
+      firstName: string; lastName: string; email: string; phone: string; address: string; dateOfBirth: string;
+      subject?: string; qualification?: string; experience?: string | number;
+    }>;
+    setFormData(prev => ({
+      ...prev,
+      firstName: src.firstName || '',
+      lastName: src.lastName || '',
+      email: src.email || '',
+      phone: src.phone || '',
+      address: src.address || '',
+      dateOfBirth: src.dateOfBirth ? new Date(src.dateOfBirth as string).toISOString().split('T')[0] : '',
+      // teacher-specific optional fields if present on user
+      subject: (src.subject as string) || prev.subject,
+      qualification: (src.qualification as string) || prev.qualification,
+      experience: (src.experience as string) || prev.experience,
+    }));
+  }, [profile, user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
-    console.log('Saving profile:', formData);
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      // Only allow limited fields
+      const allowed = ['firstName','lastName','phone','dateOfBirth','address'];
+      const payload: Partial<{ firstName: string; lastName: string; phone: string; dateOfBirth: string; address: string; }> = {};
+      for (const k of allowed) {
+        (payload as any)[k] = (formData as any)[k];
+      }
+      await updateProfile(payload as any).unwrap();
+      // Ensure UI shows latest server data
+      await refetch();
+      toast.success('Profile updated');
+      setIsEditing(false);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update profile');
+    }
   };
 
   const handleCancel = () => {
+    const src = (profile || user || {}) as Partial<{
+      firstName: string; lastName: string; email: string; phone: string; address: string; dateOfBirth: string;
+      subject?: string; qualification?: string; experience?: string | number;
+    }>;
     setFormData({
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-      email: user?.email || '',
-      phone: user?.phone || '',
-      address: user?.address || '',
-      dateOfBirth: user?.dateOfBirth || '',
-      subject: '',
-      qualification: '',
-      experience: '',
+      firstName: src.firstName || '',
+      lastName: src.lastName || '',
+      email: src.email || '',
+      phone: src.phone || '',
+      address: src.address || '',
+      dateOfBirth: src.dateOfBirth ? new Date(src.dateOfBirth as string).toISOString().split('T')[0] : '',
+      subject: (src.subject as string) || '',
+      qualification: (src.qualification as string) || '',
+      experience: (src.experience as string) || '',
     });
     setIsEditing(false);
+  };
+
+  const onAvatarClick = () => fileInputRef.current?.click();
+  const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const form = new FormData();
+    form.append('avatar', f);
+    try {
+      await uploadAvatar(form).unwrap();
+      await refetch();
+      toast.success('Profile picture updated');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to upload');
+    }
+  };
+
+  // Change password state and handler
+  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '' });
+  const handlePasswordChange = async () => {
+    try {
+      await changePassword(passwordData as any).unwrap();
+      toast.success('Password changed successfully');
+      setPasswordData({ currentPassword: '', newPassword: '' });
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to change password');
+    }
   };
 
   const displayName = user?.firstName && user?.lastName 
@@ -66,7 +141,8 @@ const TeacherProfile: React.FC = () => {
           <div className="flex space-x-2">
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center space-x-2"
+              disabled={saving}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center space-x-2 disabled:opacity-60"
             >
               <Save className="h-4 w-4" />
               <span>Save</span>
@@ -94,9 +170,12 @@ const TeacherProfile: React.FC = () => {
                   </span>
                 </div>
                 {isEditing && (
-                  <button className="absolute bottom-0 right-0 bg-green-600 text-white p-2 rounded-full hover:bg-green-700">
-                    <Camera className="h-4 w-4" />
-                  </button>
+                  <>
+                    <button onClick={onAvatarClick} disabled={uploadingAvatar} className="absolute bottom-0 right-0 bg-green-600 text-white p-2 rounded-full hover:bg-green-700 disabled:opacity-60">
+                      <Camera className="h-4 w-4" />
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onAvatarChange} />
+                  </>
                 )}
               </div>
               <h2 className="text-xl font-semibold text-gray-900">{displayName}</h2>
@@ -292,9 +371,25 @@ const TeacherProfile: React.FC = () => {
               <h4 className="font-medium text-gray-900">Change Password</h4>
               <p className="text-sm text-gray-600">Update your account password</p>
             </div>
-            <button className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">
-              Change Password
-            </button>
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                placeholder="Current"
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                className="px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <input
+                type="password"
+                placeholder="New"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                className="px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button onClick={handlePasswordChange} disabled={changingPassword} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-60">
+                Change
+              </button>
+            </div>
           </div>
         </div>
       </div>

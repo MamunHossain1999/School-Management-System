@@ -1,5 +1,4 @@
-
-import type { Fee, ApiResponse } from '../../types';
+import type { ApiResponse } from '../../types';
 import { baseApi } from './baseApi';
 
 export interface FeeRecord {
@@ -27,6 +26,38 @@ export interface Payment {
   paymentDate: string;
   receivedBy: string;
   createdAt: string;
+}
+
+export interface FeeSummary {
+  totalFees: number;
+  paidAmount: number;
+  pendingAmount: number;
+  overdueAmount: number;
+  fees: FeeRecord[];
+}
+
+export interface FeeReport {
+  totalCollected: number;
+  totalPending: number;
+  totalOverdue: number;
+  classWiseReport: ClassWiseReport[];
+  monthlyReport: MonthlyReport[];
+}
+
+export interface ClassWiseReport {
+  classId: string;
+  className: string;
+  totalStudents: number;
+  totalFees: number;
+  collectedAmount: number;
+  pendingAmount: number;
+}
+
+export interface MonthlyReport {
+  month: string;
+  year: number;
+  totalCollected: number;
+  totalPending: number;
 }
 
 export interface CreateFeeRequest {
@@ -84,10 +115,10 @@ export const feeApi = baseApi.injectEndpoints({
       invalidatesTags: ['Fee'],
     }),
     
-    // Payment management
-    payFee: builder.mutation<Payment, { feeId: string; paymentData: PaymentRequest }>({
+    // Payment management - POST /:feeId/payment
+    processPayment: builder.mutation<Payment, { feeId: string; paymentData: PaymentRequest }>({
       query: ({ feeId, paymentData }) => ({
-        url: `/api/fees/${feeId}/pay`,
+        url: `/api/fees/${feeId}/payment`,
         method: 'POST',
         body: paymentData,
       }),
@@ -95,29 +126,33 @@ export const feeApi = baseApi.injectEndpoints({
       invalidatesTags: ['Fee', 'Payment'],
     }),
 
-    getPayments: builder.query<Payment[], { studentId?: string; feeId?: string }>({
+    // GET /student/:studentId/summary
+    getStudentFeeSummary: builder.query<FeeSummary, string>({
+      query: (studentId) => `/api/fees/student/${studentId}/summary`,
+      transformResponse: (response: ApiResponse<FeeSummary>) => response.data,
+      providesTags: ['Fee'],
+    }),
+
+    // GET /payment-history
+    getPaymentHistory: builder.query<Payment[], { studentId?: string; startDate?: string; endDate?: string }>({
       query: (params) => ({
-        url: '/api/payments',
+        url: '/api/fees/payment-history',
         params,
       }),
       transformResponse: (response: ApiResponse<Payment[]>) => response.data,
       providesTags: ['Payment'],
     }),
 
-    getPaymentHistory: builder.query<Payment[], string>({
-      query: (studentId) => `/api/payments/student/${studentId}`,
-      transformResponse: (response: ApiResponse<Payment[]>) => response.data,
-      providesTags: ['Payment'],
-    }),
-
-    generateFeeReport: builder.query<any, { classId?: string; startDate?: string; endDate?: string }>({
+    // GET /report
+    generateFeeReport: builder.query<FeeReport, { classId?: string; startDate?: string; endDate?: string }>({
       query: (params) => ({
         url: '/api/fees/report',
         params,
       }),
-      transformResponse: (response: ApiResponse<any>) => response.data,
+      transformResponse: (response: ApiResponse<FeeReport>) => response.data,
     }),
 
+    // Additional helper endpoints
     getOverdueFees: builder.query<FeeRecord[], void>({
       query: () => '/api/fees/overdue',
       transformResponse: (response: ApiResponse<FeeRecord[]>) => response.data,
@@ -131,8 +166,8 @@ export const {
   useCreateFeeMutation,
   useUpdateFeeMutation,
   useDeleteFeeMutation,
-  usePayFeeMutation,
-  useGetPaymentsQuery,
+  useProcessPaymentMutation,
+  useGetStudentFeeSummaryQuery,
   useGetPaymentHistoryQuery,
   useGenerateFeeReportQuery,
   useGetOverdueFeesQuery,

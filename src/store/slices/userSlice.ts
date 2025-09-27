@@ -1,16 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
-import type { User } from "../api/userApi";
-import { userApi } from "../api";
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import type { User } from '../../types';
+import Cookies from 'js-cookie';
 
-
-interface UserState {
+export interface UserState {
   users: User[];
   students: User[];
   teachers: User[];
   parents: User[];
-  admins: User[];
-  currentUser: User | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -20,100 +18,103 @@ const initialState: UserState = {
   students: [],
   teachers: [],
   parents: [],
-  admins: [],
-  currentUser: null,
   isLoading: false,
   error: null,
 };
 
-// ✅ Async Thunks
-export const fetchUsers = createAsyncThunk<User[], string | undefined, { rejectValue: string }>(
-  "user/fetchUsers",
-  async (role, { rejectWithValue, dispatch }) => {
+// Fetch all users
+export const fetchUsers = createAsyncThunk<User[], void, { rejectValue: string }>(
+  'user/fetchUsers',
+  async (_, { rejectWithValue }) => {
     try {
-      const params = role ? { role } : {};
-      const result = await dispatch(userApi.endpoints.getUsers.initiate(params));
-      
-      if ('data' in result && result.data) {
-        return Array.isArray(result.data) ? result.data : [result.data];
+      // Use token with fallback to refreshToken and synchronize if needed
+      let token = Cookies.get('token');
+      const refreshToken = Cookies.get('refreshToken');
+      if (!token || token === 'undefined' || token === 'null') {
+        if (refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null') {
+          token = refreshToken;
+          Cookies.set('token', refreshToken, { expires: 7 });
+        }
       }
-      
-      return rejectWithValue("Failed to fetch users");
-    } catch (error: any) {
-      return rejectWithValue(error.message || "Failed to fetch users");
+      const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await fetch(`${base}/api/users`, {
+        headers: {
+          'Authorization': token && token !== 'undefined' && token !== 'null' ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || 'Failed to fetch users');
+      }
+      const data = await res.json();
+      // Normalize various possible response shapes to an array
+      let users: User[] = [];
+      if (Array.isArray(data)) {
+        users = data as User[];
+      } else if (Array.isArray(data?.data)) {
+        users = data.data as User[];
+      } else if (Array.isArray(data?.data?.users)) {
+        users = data.data.users as User[];
+      } else if (Array.isArray(data?.users)) {
+        users = data.users as User[];
+      } else {
+        users = [];
+      }
+      return users;
+    } catch (err: any) {
+      return rejectWithValue(err?.message || 'Failed to fetch users');
     }
   }
 );
 
-export const createUser = createAsyncThunk<User, { firstName: string; lastName: string; email: string; password: string; role: 'admin' | 'teacher' | 'student' | 'parent'; phone?: string; address?: string; dateOfBirth?: string }, { rejectValue: string }>(
-  "user/createUser",
-  async (userData, { rejectWithValue, dispatch }) => {
-    try {
-      const result = await dispatch(userApi.endpoints.createUser.initiate(userData));
-      
-      if ('data' in result && result.data) {
-        return result.data;
-      }
-      
-      return rejectWithValue("Failed to create user");
-    } catch (error: any) {
-      return rejectWithValue(error.message || "Failed to create user");
-    }
-  }
-);
-
-export const updateUser = createAsyncThunk<User, { id: string; userData: { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string; dateOfBirth?: string; profilePicture?: string } }, { rejectValue: string }>(
-  "user/updateUser",
-  async ({ id, userData }, { rejectWithValue, dispatch }) => {
-    try {
-      const result = await dispatch(userApi.endpoints.updateUser.initiate({ id, data: userData }));
-      
-      if ('data' in result && result.data) {
-        return result.data;
-      }
-      
-      return rejectWithValue("Failed to update user");
-    } catch (error: any) {
-      return rejectWithValue(error.message || "Failed to update user");
-    }
-  }
-);
-
+// Delete a user
 export const deleteUser = createAsyncThunk<string, string, { rejectValue: string }>(
-  "user/deleteUser",
-  async (id, { rejectWithValue, dispatch }) => {
+  'user/deleteUser',
+  async (id, { rejectWithValue }) => {
     try {
-      const result = await dispatch(userApi.endpoints.deleteUser.initiate(id));
-      
-      if ('data' in result || !('error' in result)) {
-        return id;
+      let token = Cookies.get('token');
+      const refreshToken = Cookies.get('refreshToken');
+      if (!token || token === 'undefined' || token === 'null') {
+        if (refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null') {
+          token = refreshToken;
+          Cookies.set('token', refreshToken, { expires: 7 });
+        }
       }
-      
-      return rejectWithValue("Failed to delete user");
-    } catch (error: any) {
-      return rejectWithValue(error.message || "Failed to delete user");
+      const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await fetch(`${base}/api/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token && token !== 'undefined' && token !== 'null' ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || 'Failed to delete user');
+      }
+      return id;
+    } catch (err: any) {
+      return rejectWithValue(err?.message || 'Failed to delete user');
     }
   }
 );
 
-// ✅ Slice
-const userSlice = createSlice({
-  name: "user",
+const slice = createSlice({
+  name: 'user',
   initialState,
   reducers: {
-    clearError: (state) => {
-      state.error = null;
+    setUsers: (state, action: PayloadAction<User[]>) => {
+      state.users = Array.isArray(action.payload) ? action.payload : [];
+      const list = Array.isArray(state.users) ? state.users : [];
+      state.students = list.filter(u => u.role === 'student');
+      state.teachers = list.filter(u => u.role === 'teacher');
+      state.parents = list.filter(u => u.role === 'parent');
     },
-    setCurrentUser: (state, action: PayloadAction<User>) => {
-      state.currentUser = action.payload;
-    },
-    clearUsers: (state) => {
-      state.users = [];
-      state.students = [];
-      state.teachers = [];
-      state.parents = [];
-      state.admins = [];
-    },
+    clearError: (state) => { state.error = null; },
   },
   extraReducers: (builder) => {
     builder
@@ -123,53 +124,31 @@ const userSlice = createSlice({
       })
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.isLoading = false;
-
-        // ✅ Payload নিশ্চিতভাবে array
-        const usersArray = Array.isArray(action.payload) ? action.payload : [action.payload];
-
-        state.users = usersArray;
-        state.students = usersArray.filter((u) => u.role === "student");
-        state.teachers = usersArray.filter((u) => u.role === "teacher");
-        state.parents = usersArray.filter((u) => u.role === "parent");
-        state.admins = usersArray.filter((u) => u.role === "admin");
+        state.users = Array.isArray(action.payload) ? action.payload : [];
+        const list = Array.isArray(state.users) ? state.users : [];
+        state.students = list.filter(u => u.role === 'student');
+        state.teachers = list.filter(u => u.role === 'teacher');
+        state.parents = list.filter(u => u.role === 'parent');
       })
       .addCase(fetchUsers.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload as string;
+        state.error = action.payload || 'Failed to fetch users';
       })
-      .addCase(createUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.users.push(action.payload);
 
-        switch (action.payload.role) {
-          case "student":
-            state.students.push(action.payload);
-            break;
-          case "teacher":
-            state.teachers.push(action.payload);
-            break;
-          case "parent":
-            state.parents.push(action.payload);
-            break;
-          case "admin":
-            state.admins.push(action.payload);
-            break;
-        }
-      })
-      .addCase(updateUser.fulfilled, (state, action) => {
-        const index = state.users.findIndex((u) => u._id === action.payload._id);
-        if (index !== -1) state.users[index] = action.payload;
-      })
       .addCase(deleteUser.fulfilled, (state, action) => {
-        const userId = action.payload;
-        state.users = state.users.filter((u) => u._id !== userId);
-        state.students = state.students.filter((s) => s._id !== userId);
-        state.teachers = state.teachers.filter((t) => t._id !== userId);
-        state.parents = state.parents.filter((p) => p._id !== userId);
-        state.admins = state.admins.filter((a) => a._id !== userId);
+        const id = action.payload;
+        const current = Array.isArray(state.users) ? state.users : [];
+        state.users = current.filter(u => (u._id || (u as any).id) !== id);
+        const list = Array.isArray(state.users) ? state.users : [];
+        state.students = list.filter(u => u.role === 'student');
+        state.teachers = list.filter(u => u.role === 'teacher');
+        state.parents = list.filter(u => u.role === 'parent');
+      })
+      .addCase(deleteUser.rejected, (state, action) => {
+        state.error = action.payload || 'Failed to delete user';
       });
   },
 });
 
-export const { clearError, setCurrentUser, clearUsers } = userSlice.actions;
-export default userSlice.reducer;
+export const { setUsers, clearError } = slice.actions;
+export default slice.reducer;

@@ -1,14 +1,23 @@
 import { baseApi } from './baseApi';
-import type { Attendance, ApiResponse } from '../../types';
 
 export interface AttendanceRecord {
   _id: string;
-  student: string;
+  student: {
+    _id: string;
+    name: string;
+    rollNumber: string;
+    class: string;
+    section: string;
+  };
   class: string;
   section: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
-  markedBy: string;
+  status: 'present' | 'absent' | 'late' | 'excused';
+  markedBy: {
+    _id: string;
+    name: string;
+  };
+  remarks?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -18,7 +27,30 @@ export interface AttendanceSummary {
   presentDays: number;
   absentDays: number;
   lateDays: number;
+  excusedDays: number;
   attendancePercentage: number;
+  classAverage?: number;
+  monthlyStats?: {
+    month: string;
+    present: number;
+    absent: number;
+    late: number;
+    excused: number;
+    percentage: number;
+  }[];
+}
+
+export interface ClassAttendanceSummary {
+  class: string;
+  section: string;
+  date: string;
+  totalStudents: number;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  excusedCount: number;
+  attendancePercentage: number;
+  students: AttendanceRecord[];
 }
 
 export interface MarkAttendanceRequest {
@@ -28,80 +60,141 @@ export interface MarkAttendanceRequest {
   attendance: {
     studentId: string;
     status: 'present' | 'absent' | 'late' | 'excused';
+    remarks?: string;
   }[];
+}
+
+export interface AttendanceFilters {
+  date?: string;
+  startDate?: string;
+  endDate?: string;
+  classId?: string;
+  sectionId?: string;
+  studentId?: string;
+  status?: 'present' | 'absent' | 'late' | 'excused';
 }
 
 export const attendanceApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    // Get all attendance or filter by date/class/student
-    getAttendance: builder.query<Attendance[], { date?: string; classId?: string; studentId?: string } | void>({
-      query: (filters) => ({
-        url: '/api/attendance',
-        params: filters || {},
-      }),
-      transformResponse: (response: ApiResponse<Attendance[]>) => response.data,
-      providesTags: ['Attendance'],
-    }),
-
-    // Mark attendance for a class
+    // POST /api/attendance/mark - Mark attendance
     markAttendance: builder.mutation<AttendanceRecord[], MarkAttendanceRequest>({
       query: (attendanceData) => ({
         url: '/api/attendance/mark',
         method: 'POST',
         body: attendanceData,
       }),
-      transformResponse: (response: ApiResponse<AttendanceRecord[]>) => response.data,
       invalidatesTags: ['Attendance'],
     }),
 
-    // Get student attendance summary
+    // GET /api/attendance - Get attendance records with filters
+    getAttendanceRecords: builder.query<AttendanceRecord[], AttendanceFilters | void>({
+      query: (filters) => ({
+        url: '/api/attendance',
+        params: filters || {},
+      }),
+      providesTags: ['Attendance'],
+    }),
+
+    // GET /api/attendance/student/:studentId - Get student attendance
     getStudentAttendance: builder.query<AttendanceRecord[], { studentId: string; startDate?: string; endDate?: string }>({
       query: ({ studentId, startDate, endDate }) => ({
         url: `/api/attendance/student/${studentId}`,
         params: { startDate, endDate },
       }),
-      transformResponse: (response: ApiResponse<AttendanceRecord[]>) => response.data,
       providesTags: ['Attendance'],
     }),
 
-    // Get attendance summary for a student
-    getAttendanceSummary: builder.query<AttendanceSummary, { studentId: string; startDate?: string; endDate?: string }>({
-      query: ({ studentId, startDate, endDate }) => ({
-        url: `/api/attendance/student/${studentId}/summary`,
-        params: { startDate, endDate },
+    // GET /api/attendance/summary - Get class attendance summary
+    getAttendanceSummary: builder.query<ClassAttendanceSummary[], { 
+      classId?: string; 
+      sectionId?: string; 
+      date?: string; 
+      startDate?: string; 
+      endDate?: string; 
+    } | void>({
+      query: (params) => ({
+        url: '/api/attendance/summary',
+        params: params || {},
       }),
-      transformResponse: (response: ApiResponse<AttendanceSummary>) => response.data,
       providesTags: ['Attendance'],
     }),
 
-    // Get class attendance for a specific date
-    getClassAttendance: builder.query<AttendanceRecord[], { classId: string; sectionId: string; date: string }>({
+    // GET /api/attendance/me - Get own attendance (student/parent)
+    getMyAttendance: builder.query<{
+      records: AttendanceRecord[];
+      summary: AttendanceSummary;
+    }, { startDate?: string; endDate?: string } | void>({
+      query: (params) => ({
+        url: '/api/attendance/me',
+        params: params || {},
+      }),
+      providesTags: ['Attendance'],
+    }),
+
+    // Additional helper endpoints
+    // Get attendance for a specific class and date
+    getClassAttendanceByDate: builder.query<AttendanceRecord[], { 
+      classId: string; 
+      sectionId?: string; 
+      date: string; 
+    }>({
       query: ({ classId, sectionId, date }) => ({
-        url: `/api/attendance/class/${classId}/section/${sectionId}`,
-        params: { date },
+        url: '/api/attendance',
+        params: { classId, sectionId, date },
       }),
-      transformResponse: (response: ApiResponse<AttendanceRecord[]>) => response.data,
       providesTags: ['Attendance'],
     }),
 
     // Update individual attendance record
-    updateAttendance: builder.mutation<AttendanceRecord, { id: string; status: 'present' | 'absent' | 'late' }>({
-      query: ({ id, status }) => ({
+    updateAttendanceRecord: builder.mutation<AttendanceRecord, { 
+      id: string; 
+      status: 'present' | 'absent' | 'late' | 'excused';
+      remarks?: string;
+    }>({
+      query: ({ id, ...updateData }) => ({
         url: `/api/attendance/${id}`,
         method: 'PUT',
-        body: { status },
+        body: updateData,
       }),
-      transformResponse: (response: ApiResponse<AttendanceRecord>) => response.data,
       invalidatesTags: ['Attendance'],
+    }),
+
+    // Delete attendance record
+    deleteAttendanceRecord: builder.mutation<{ message: string }, string>({
+      query: (id) => ({
+        url: `/api/attendance/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Attendance'],
+    }),
+
+    // Get attendance statistics for dashboard
+    getAttendanceStats: builder.query<{
+      totalStudents: number;
+      presentToday: number;
+      absentToday: number;
+      lateToday: number;
+      attendanceRate: number;
+      weeklyStats: { date: string; present: number; absent: number; late: number; }[];
+      classWiseStats: { class: string; section: string; present: number; total: number; percentage: number; }[];
+    }, { date?: string } | void>({
+      query: (params) => ({
+        url: '/api/attendance/stats',
+        params: params || {},
+      }),
+      providesTags: ['Attendance'],
     }),
   }),
 });
 
 export const {
-  useGetAttendanceQuery,
   useMarkAttendanceMutation,
+  useGetAttendanceRecordsQuery,
   useGetStudentAttendanceQuery,
   useGetAttendanceSummaryQuery,
-  useGetClassAttendanceQuery,
-  useUpdateAttendanceMutation,
+  useGetMyAttendanceQuery,
+  useGetClassAttendanceByDateQuery,
+  useUpdateAttendanceRecordMutation,
+  useDeleteAttendanceRecordMutation,
+  useGetAttendanceStatsQuery,
 } = attendanceApi;

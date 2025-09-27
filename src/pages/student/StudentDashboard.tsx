@@ -11,46 +11,43 @@ import {
 } from 'lucide-react';
 import type { RootState } from '../../store';
 import { useGetFeesQuery } from '../../store/api/feeApi';
+import { useGetAssignmentsQuery } from '../../store/api/assignmentApi';
+import { useGetMyAttendanceQuery } from '../../store/api/attendanceApi';
+
 
 
 const StudentDashboard: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   
-  // Use RTK Query to fetch fees data
-  const { data: fees } = useGetFeesQuery(user?.id || '', {
-    skip: !user?.id,
+  // Use RTK Query to fetch real data from server
+  const { data: fees } = useGetFeesQuery({
+    studentId: user?._id || user?.id || '',
+    status: 'pending'
+  }, {
+    skip: !user?._id && !user?.id,
   });
 
-  const upcomingAssignments = [
-    {
-      id: 1,
-      title: 'Physics Lab Report',
-      subject: 'Physics',
-      dueDate: '2024-01-15',
-      status: 'pending',
-    },
-    {
-      id: 2,
-      title: 'English Essay',
-      subject: 'English',
-      dueDate: '2024-01-18',
-      status: 'pending',
-    },
-    {
-      id: 3,
-      title: 'Math Problem Set',
-      subject: 'Mathematics',
-      dueDate: '2024-01-20',
-      status: 'pending',
-    },
-    {
-      id: 4,
-      title: 'History Research',
-      subject: 'History',
-      dueDate: '2024-01-22',
-      status: 'pending',
-    },
-  ];
+  const { data: assignments } = useGetAssignmentsQuery({
+    class: '',
+    subject: ''
+  }, {
+    skip: false,
+  });
+
+  const { data: attendanceData } = useGetMyAttendanceQuery({
+    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0]
+  }, {
+    skip: !user?._id && !user?.id,
+  });
+
+  // Use real assignments data or fallback to empty array
+  const upcomingAssignments = assignments || [];
+  
+  // Calculate attendance rate from real data
+  const attendanceRate = attendanceData?.summary?.attendancePercentage 
+    ? Math.round(attendanceData.summary.attendancePercentage)
+    : 94;
 
   // Calculate total pending fees
   const totalPendingFees = fees?.reduce((total, fee) => {
@@ -60,7 +57,7 @@ const StudentDashboard: React.FC = () => {
   const stats = [
     {
       title: 'Attendance Rate',
-      value: '94%',
+      value: `${attendanceRate}%`,
       icon: ClipboardCheck,
       color: 'bg-green-500',
       description: 'This month',
@@ -70,7 +67,7 @@ const StudentDashboard: React.FC = () => {
       value: upcomingAssignments.length,
       icon: FileText,
       color: 'bg-blue-500',
-      description: `${upcomingAssignments.filter(a => a.status === 'pending').length} pending`,
+      description: `${upcomingAssignments.length} total`,
     },
     {
       title: 'Overall Grade',
@@ -174,7 +171,7 @@ const StudentDashboard: React.FC = () => {
           </div>
           <div className="space-y-3">
             {upcomingAssignments.map((assignment) => (
-              <div key={assignment.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+              <div key={assignment._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">{assignment.title}</p>
                   <p className="text-sm text-gray-600">{assignment.subject}</p>

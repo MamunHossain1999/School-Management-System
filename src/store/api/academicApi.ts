@@ -1,16 +1,68 @@
 import { baseApi } from './baseApi';
-import type { Class, Subject, ApiResponse } from '../../types';
+import type { Class, Subject, Section, ApiResponse, User } from '../../types';
+
+// DTOs for create operations matching backend API
+type CreateClassDTO = {
+  name: string;
+  grade: number; // 1-12
+  academicYear: string;
+};
+
+type UpdateClassDTO = {
+  name?: string;
+  grade?: number;
+  academicYear?: string;
+};
+
+type CreateSubjectDTO = {
+  name: string;
+  code: string;
+  classIds?: string[]; // array of related class IDs
+  credits?: number;
+  type?: 'core' | 'elective';
+};
+
+type UpdateSubjectDTO = {
+  name?: string;
+  code?: string;
+  classIds?: string[];
+  credits?: number;
+  type?: 'core' | 'elective';
+};
+
+type CreateSectionDTO = {
+  name: string;
+  classId: string;
+};
+
+type UpdateSectionDTO = {
+  name?: string;
+  classId?: string;
+};
+
+type EnrollStudentDTO = {
+  userId: string;
+  classId?: string;
+  sectionId?: string;
+};
+
+type AssignTeacherDTO = {
+  teacherId: string;
+  classId?: string;
+  sectionId?: string;
+  subjectIds?: string[];
+};
 
 export const academicApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    // Classes
+    // Classes Management
     getClasses: builder.query<Class[], void>({
       query: () => '/api/academic/classes',
       transformResponse: (response: ApiResponse<Class[]>) => response.data,
       providesTags: ['Class'],
     }),
     
-    createClass: builder.mutation<Class, Partial<Class>>({
+    createClass: builder.mutation<Class, CreateClassDTO>({
       query: (classData) => ({
         url: '/api/academic/classes',
         method: 'POST',
@@ -20,18 +72,43 @@ export const academicApi = baseApi.injectEndpoints({
       invalidatesTags: ['Class'],
     }),
 
-    // Subjects
+    updateClass: builder.mutation<Class, { id: string; data: UpdateClassDTO }>({
+      query: ({ id, data }) => ({
+        url: `/api/academic/classes/${id}`,
+        method: 'PUT',
+        body: data,
+      }),
+      transformResponse: (response: ApiResponse<Class>) => response.data,
+      invalidatesTags: ['Class'],
+    }),
+
+    deleteClass: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/api/academic/classes/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Class'],
+    }),
+
+    // Subjects Management
     getSubjects: builder.query<Subject[], { classId?: string } | void>({
       query: (params) => ({
-        url: '/api/academic/subjects',
+        url: '/api/subjects',
         params: params || {},
       }),
       transformResponse: (response: ApiResponse<Subject[]>) => response.data,
       providesTags: ['Subject'],
     }),
-    createSubject: builder.mutation<Subject, Partial<Subject>>({
+
+    getSubjectById: builder.query<Subject, string>({
+      query: (id) => `/api/subjects/${id}`,
+      transformResponse: (response: ApiResponse<Subject>) => response.data,
+      providesTags: ['Subject'],
+    }),
+
+    createSubject: builder.mutation<Subject, CreateSubjectDTO>({
       query: (subjectData) => ({
-        url: '/api/academic/subjects',
+        url: '/api/subjects',
         method: 'POST',
         body: subjectData,
       }),
@@ -39,12 +116,147 @@ export const academicApi = baseApi.injectEndpoints({
       invalidatesTags: ['Subject'],
     }),
 
+    updateSubject: builder.mutation<Subject, { id: string; data: UpdateSubjectDTO }>({
+      query: ({ id, data }) => ({
+        url: `/api/subjects/${id}`,
+        method: 'PUT',
+        body: data,
+      }),
+      transformResponse: (response: ApiResponse<Subject>) => response.data,
+      invalidatesTags: ['Subject'],
+    }),
+
+    deleteSubject: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/api/subjects/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Subject'],
+    }),
+
+    assignTeachersToSubject: builder.mutation<Subject, { id: string; teacherIds: string[] }>({
+      query: ({ id, teacherIds }) => ({
+        url: `/api/subjects/${id}/teachers`,
+        method: 'PUT',
+        body: { teacherIds },
+      }),
+      transformResponse: (response: ApiResponse<Subject>) => response.data,
+      invalidatesTags: ['Subject'],
+    }),
+
+    getSubjectsByTeacher: builder.query<Subject[], string>({
+      query: (teacherId) => `/api/subjects/teacher/${teacherId}`,
+      transformResponse: (response: ApiResponse<Subject[]>) => response.data,
+      providesTags: ['Subject'],
+    }),
+
+    // Sections Management
+    getSections: builder.query<Section[], { classId?: string } | void>({
+      query: (params) => ({
+        url: '/api/academic/sections',
+        params: params || {},
+      }),
+      transformResponse: (response: ApiResponse<Section[]>) => response.data,
+      providesTags: ['Section'],
+    }),
+
+    createSection: builder.mutation<Section, CreateSectionDTO>({
+      query: (sectionData) => ({
+        url: '/api/academic/sections',
+        method: 'POST',
+        body: sectionData,
+      }),
+      transformResponse: (response: ApiResponse<Section>) => response.data,
+      invalidatesTags: ['Section'],
+    }),
+
+    updateSection: builder.mutation<Section, { id: string; data: UpdateSectionDTO }>({
+      query: ({ id, data }) => ({
+        url: `/api/academic/sections/${id}`,
+        method: 'PUT',
+        body: data,
+      }),
+      transformResponse: (response: ApiResponse<Section>) => response.data,
+      invalidatesTags: ['Section'],
+    }),
+
+    deleteSection: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/api/academic/sections/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Section'],
+    }),
+
+    // Student Management
+    enrollStudent: builder.mutation<unknown, EnrollStudentDTO>({
+      query: (payload) => ({
+        url: '/api/academic/students',
+        method: 'POST',
+        body: payload,
+      }),
+      transformResponse: (response: ApiResponse<unknown>) => response.data,
+      invalidatesTags: ['Student', 'Enrollment'],
+    }),
+
+    getAcademicStudents: builder.query<User[], { classId?: string; sectionId?: string } | void>({
+      query: (params) => ({
+        url: '/api/academic/students',
+        params: params || {},
+      }),
+      transformResponse: (response: ApiResponse<User[]>) => response.data,
+      providesTags: ['Student'],
+    }),
+
+    // Teacher Management
+    assignTeacher: builder.mutation<unknown, AssignTeacherDTO>({
+      query: (payload) => ({
+        url: '/api/academic/teachers',
+        method: 'POST',
+        body: payload,
+      }),
+      transformResponse: (response: ApiResponse<unknown>) => response.data,
+      invalidatesTags: ['Teacher'],
+    }),
+
+    getAcademicTeachers: builder.query<User[], { classId?: string; sectionId?: string; subjectId?: string } | void>({
+      query: (params) => ({
+        url: '/api/academic/teachers',
+        params: params || {},
+      }),
+      transformResponse: (response: ApiResponse<User[]>) => response.data,
+      providesTags: ['Teacher'],
+    }),
+
   }),
 });
 
 export const {
+  // Classes
   useGetClassesQuery,
   useCreateClassMutation,
+  useUpdateClassMutation,
+  useDeleteClassMutation,
+  
+  // Subjects
   useGetSubjectsQuery,
+  useGetSubjectByIdQuery,
   useCreateSubjectMutation,
+  useUpdateSubjectMutation,
+  useDeleteSubjectMutation,
+  useAssignTeachersToSubjectMutation,
+  useGetSubjectsByTeacherQuery,
+  
+  // Sections
+  useGetSectionsQuery,
+  useCreateSectionMutation,
+  useUpdateSectionMutation,
+  useDeleteSectionMutation,
+  
+  // Students & Teachers
+  useEnrollStudentMutation,
+  useGetAcademicStudentsQuery,
+  useAssignTeacherMutation,
+  useGetAcademicTeachersQuery,
 } = academicApi;
+
