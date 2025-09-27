@@ -7,7 +7,8 @@ import toast from "react-hot-toast";
 import { Eye, EyeOff, School, Lock, Mail, Users, BookOpen, GraduationCap, Heart, Sparkles, Shield, Zap } from "lucide-react";
 import type { RootState } from "../../store";
 import type { AppDispatch } from "../../store";
-import { loginUser, clearError } from "../../store/slices/authSlice";
+import { clearError, setToken, setUser, setRefreshToken, setLoading } from "../../store/slices/authSlice";
+import { useLoginMutation } from "../../store/api/authApi";
 import type { LoginCredentials } from "../../types";
 
 const Login: React.FC = () => {
@@ -16,20 +17,33 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { isLoading, error, isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
-  const { register, handleSubmit, formState: { errors }, watch } = useForm<LoginCredentials>();
+  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<LoginCredentials>();
   const selectedRole = watch("role");
+  const [login, { isLoading: isAuthLoading }] = useLoginMutation();
 
   useEffect(() => {
     console.log('🔍 Login useEffect triggered:', { isAuthenticated, user }); // Debug log
     if (isAuthenticated && user) {
       console.log('🚀 Navigating to dashboard for role:', user.role); // Debug log
-      switch (user.role) {
-        case "admin": navigate("/admin/dashboard"); break;
-        case "teacher": navigate("/teacher/dashboard"); break;
-        case "student": navigate("/student/dashboard"); break;
-        case "parent": navigate("/parent/dashboard"); break;
-        default: navigate("/"); 
-      }
+      // Add a small delay to ensure state is fully updated
+      setTimeout(() => {
+        switch (user.role) {
+          case "admin": 
+            navigate("/admin/dashboard", { replace: true }); 
+            break;
+          case "teacher": 
+            navigate("/teacher/dashboard", { replace: true }); 
+            break;
+          case "student": 
+            navigate("/student/dashboard", { replace: true }); 
+            break;
+          case "parent": 
+            navigate("/parent/dashboard", { replace: true }); 
+            break;
+          default: 
+            navigate("/", { replace: true }); 
+        }
+      }, 100);
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -41,26 +55,30 @@ const Login: React.FC = () => {
   }, [error, dispatch]);
 
   const onSubmit = async (data: LoginCredentials) => {
-    console.log('📝 Form submitted with data:', data); // Debug log
-    console.log('🔄 Starting login process...'); // Debug log
-    
     try {
-      console.log('📡 Dispatching loginUser action...'); // Debug log
-      const result = await dispatch(loginUser(data)).unwrap();
-      console.log('🎉 Login result received:', result); // Debug log
-      toast.success("Login successful!");
+      dispatch(setLoading(true));
+      const res = await login({ email: data.email, password: data.password, role: data.role } as any).unwrap();
+      if (res?.user) {
+        if (res.token) dispatch(setToken(res.token));
+        if ((res as any).refreshToken) dispatch(setRefreshToken((res as any).refreshToken as any));
+        dispatch(setUser(res.user));
+        toast.success('Login successful!');
+      } else {
+        toast.error('Login failed');
+      }
     } catch (error: any) {
-      console.error('❌ Login error in component:', error); // Debug log
-      console.error('❌ Error details:', JSON.stringify(error, null, 2)); // Debug log
-      toast.error(error || 'Login failed');
+      const msg = error?.normalizedMessage || error?.data?.message || error?.message || 'Login failed';
+      toast.error(msg);
+    } finally {
+      dispatch(setLoading(false));
     }
   };
 
   const demoCredentials = {
-    admin: { email: "admin@school.com", password: "admin123" },
-    teacher: { email: "teacher@school.com", password: "teacher123" },
-    student: { email: "student@school.com", password: "student123" },
-    parent: { email: "parent@school.com", password: "parent123" },
+    admin: { email: "mamun@gmail.com", password: "mamun123" },
+    teacher: { email: "masud@gmail.com", password: "mamun123" },
+    student: { email: "siya@gmail.com", password: "mamun123" },
+    parent: { email: "ismaile@gmail.com", password: "mamun123" },
   };
 
   const roleIcons = { admin: Users, teacher: BookOpen, student: GraduationCap, parent: Heart };
@@ -168,12 +186,19 @@ const Login: React.FC = () => {
                 <p className="font-semibold mb-1">Demo Credentials for {selectedRole}:</p>
                 <p><span className="text-purple-300">Email:</span> {demoCredentials[selectedRole].email}</p>
                 <p><span className="text-purple-300">Password:</span> {demoCredentials[selectedRole].password}</p>
+                <button
+                  type="button"
+                  onClick={() => { setValue('email', demoCredentials[selectedRole].email as any); setValue('password', demoCredentials[selectedRole].password as any); }}
+                  className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white"
+                >
+                  Autofill
+                </button>
               </div>
             )}
 
             {/* Submit */}
-            <button type="submit" disabled={isLoading} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg transition-all disabled:opacity-50">
-              {isLoading ? (
+            <button type="submit" disabled={isLoading || isAuthLoading} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg transition-all disabled:opacity-50">
+              {isLoading || isAuthLoading ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Signing in...
