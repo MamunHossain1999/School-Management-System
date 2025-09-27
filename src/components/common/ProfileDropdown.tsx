@@ -54,13 +54,13 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ colorScheme = 'blue' 
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
   const handleLogout = async () => {
     try {
-      await dispatch(logoutUser()).unwrap();
+      await logoutUser(dispatch);
       toast.success('Logged out successfully');
       navigate('/login');
     } catch {
@@ -87,7 +87,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ colorScheme = 'blue' 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
         className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
       >
         <div className={`w-8 h-8 ${colors.avatar} rounded-full flex items-center justify-center`}>
@@ -105,7 +105,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ colorScheme = 'blue' 
       </button>
 
       {isOpen && (
-        <div className={`absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border ${colors.dropdown} z-50`}>
+        <div className={`absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border ${colors.dropdown} z-[1000]`}>
           {/* Profile Header */}
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center space-x-3">
