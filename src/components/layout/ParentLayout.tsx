@@ -11,13 +11,22 @@ import {
   Home,
   GraduationCap,
   ClipboardList,
-  Bell
+  Bell,
+  Calendar,
+  DollarSign,
+  FileCheck,
+  Award,
+  MessageSquare,
+  Bus,
+  Bed,
+  User
 } from 'lucide-react';
 import type { RootState } from '../../store';
 import type { AppDispatch } from '../../store';
 import { logoutUser } from '../../store/slices/authSlice';
 import ProfileDropdown from '../common/ProfileDropdown';
 import toast from 'react-hot-toast';
+import { routes } from '../../routes';
 
 const ParentLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,18 +36,26 @@ const ParentLayout: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
 
   const menuItems = [
-    { path: '/parent/dashboard', icon: Home, label: 'Dashboard' },
-    { path: '/parent/classes', icon: GraduationCap, label: 'Classes' },
-    { path: '/parent/subjects', icon: GraduationCap, label: 'Subjects' },
-    { path: '/parent/assignments', icon: FileText, label: 'Assignments' },
-    { path: '/parent/attendance', icon: ClipboardList, label: 'Attendance' },
-    { path: '/parent/grades', icon: FileText, label: 'Grades' },
-    { path: '/parent/profile', icon: Settings, label: 'Profile' },
+    { path: routes.parent.dashboard, icon: Home, label: 'Dashboard' },
+    { path: routes.parent.childProfile, icon: User, label: 'Child Profile' },
+    { path: routes.parent.classes, icon: GraduationCap, label: 'Classes' },
+    { path: routes.parent.subjects, icon: GraduationCap, label: 'Subjects' },
+    { path: routes.parent.attendance, icon: ClipboardList, label: 'Attendance' },
+    { path: routes.parent.exams, icon: FileCheck, label: 'Exam Schedule' },
+    { path: routes.parent.results, icon: Award, label: 'Results' },
+    { path: routes.parent.fees, icon: DollarSign, label: 'Fees & Payments' },
+    { path: routes.parent.notices, icon: Bell, label: 'Notices' },
+    { path: routes.parent.events, icon: Calendar, label: 'Events & Holidays' },
+    { path: routes.parent.assignments, icon: FileText, label: 'Assignments' },
+    { path: routes.parent.communication, icon: MessageSquare, label: 'Communication' },
+    { path: routes.parent.transport, icon: Bus, label: 'Transport' },
+    { path: routes.parent.hostel, icon: Bed, label: 'Hostel' },
+    { path: routes.parent.profile, icon: Settings, label: 'Profile' },
   ];
 
   const handleLogout = async () => {
     try {
-      await dispatch(logoutUser()).unwrap();
+      await logoutUser(dispatch);
       toast.success('Logged out successfully');
       navigate('/login');
     } catch {
@@ -47,9 +64,9 @@ const ParentLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen overflow-hidden bg-gray-50 flex">
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex h-screen flex-col`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg flex items-center justify-center">
@@ -92,7 +109,7 @@ const ParentLayout: React.FC = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -128,9 +145,9 @@ const ParentLayout: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-0">
+      <div className="flex-1 lg:ml-0 flex flex-col h-screen">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-gray-200">
           <div className="flex items-center justify-between h-16 px-6">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -155,7 +172,7 @@ const ParentLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
       </div>
