@@ -19,15 +19,16 @@ interface StudentAttendance {
 
 const AttendanceManagement: React.FC = () => {
   const { data: classes, isLoading: isClassesLoading } = useGetClassesQuery();
-  const { data: sections } = useGetSectionsQuery();
-  const [markAttendance] = useMarkAttendanceMutation();
-
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
+  // Load sections for the selected class only to keep data consistent
+  const { data: sections } = useGetSectionsQuery(selectedClass ? { classId: selectedClass } : undefined);
+  const [markAttendance] = useMarkAttendanceMutation();
   const [students, setStudents] = useState<StudentAttendance[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   // Get students for selected class and section
   const { data: studentsResponse, isLoading: isStudentsLoading } = useGetStudentsQuery(
@@ -85,7 +86,12 @@ const AttendanceManagement: React.FC = () => {
       toast.error('Please select class and section');
       return;
     }
+    // Open confirmation modal instead of direct submit
+    setIsConfirmOpen(true);
+  };
 
+  const confirmMarkAttendance = async () => {
+    if (!selectedClass || !selectedSection) return;
     setIsSubmitting(true);
     try {
       const attendanceData = {
@@ -100,6 +106,7 @@ const AttendanceManagement: React.FC = () => {
 
       await markAttendance(attendanceData).unwrap();
       toast.success('Attendance marked successfully');
+      setIsConfirmOpen(false);
     } catch (error) {
       console.error('Failed to mark attendance:', error);
       toast.error('Failed to mark attendance');
@@ -193,13 +200,11 @@ const AttendanceManagement: React.FC = () => {
             disabled={!selectedClass}
           >
             <option value="">Select Section</option>
-            {Array.isArray(sections) && sections
-              .filter((section: any) => section.classId === selectedClass)
-              .map((section: any) => (
-                <option key={section._id} value={section.name}>
-                  Section {section.name}
-                </option>
-              ))}
+            {Array.isArray(sections) && sections.map((section: any) => (
+              <option key={section.id || section._id} value={section.id || section._id}>
+                Section {section.name}
+              </option>
+            ))}
           </select>
         </div>
         <div className="flex items-end">
@@ -307,12 +312,51 @@ const AttendanceManagement: React.FC = () => {
         </>
       )}
 
-      {/* Empty State */}
-      {students.length === 0 && selectedClass && selectedSection && (
-        <div className="bg-white p-12 rounded-lg shadow-sm border text-center">
-          <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium">No Students Found</h3>
-          <p className="text-gray-600">No students found for the selected class and section.</p>
+      {/* Confirmation Modal */}
+      {isConfirmOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Attendance</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-700">You are about to mark attendance for <strong>{selectedDate}</strong> — Class <strong>{selectedClass || 'N/A'}</strong>, Section <strong>{selectedSection || 'N/A'}</strong>.</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-3 bg-gray-50 rounded border text-center">
+                  <div className="text-xl font-semibold">{attendanceStats.present}</div>
+                  <div className="text-gray-600">Present</div>
+                </div>
+                <div className="p-3 bg-gray-50 rounded border text-center">
+                  <div className="text-xl font-semibold">{attendanceStats.absent}</div>
+                  <div className="text-gray-600">Absent</div>
+                </div>
+                <div className="p-3 bg-gray-50 rounded border text-center">
+                  <div className="text-xl font-semibold">{attendanceStats.late}</div>
+                  <div className="text-gray-600">Late</div>
+                </div>
+                <div className="p-3 bg-gray-50 rounded border text-center">
+                  <div className="text-xl font-semibold">{attendanceStats.excused}</div>
+                  <div className="text-gray-600">Excused</div>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => !isSubmitting && setIsConfirmOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmMarkAttendance}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {isSubmitting ? 'Saving…' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
