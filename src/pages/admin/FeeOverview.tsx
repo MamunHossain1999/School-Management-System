@@ -128,8 +128,8 @@ const FeeOverview: React.FC = () => {
     
     // Generate CSV rows from fees data
     const rows = filteredFees.map(fee => {
-      const student = students.find(s => s._id === fee.student);
-      const studentClass = classes.find(c => c.id === fee.class);
+      const student = students.find((s: any) => s._id === fee.student);
+      const studentClass = classes.find((c: any) => (c._id || c.id) === fee.class);
       
       return [
         student ? `${student.firstName} ${student.lastName}` : 'Unknown Student',
@@ -278,8 +278,8 @@ const FeeOverview: React.FC = () => {
               className="input-field"
             >
               <option value="">All Classes</option>
-              {classes.map(cls => (
-                <option key={cls.id} value={cls.id}>{cls.name}</option>
+              {classes.map((cls: any) => (
+                <option key={cls._id || cls.id} value={cls._id || cls.id}>{cls.name}</option>
               ))}
             </select>
           </div>
