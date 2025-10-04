@@ -5,7 +5,7 @@ import ClassesPage from '../classAndSubject/ClassesPage';
 import SubjectsPage from '../classAndSubject/SubjectsPage';
 import AssignmentsPage from '../classAndSubject/AssignmentsPage';
 import SectionsPage from '../classAndSubject/SectionsPage';
-import EnrollmentPage from '../classAndSubject/EnrollmentPage.tsx';
+import EnrollmentPage from '../classAndSubject/EnrollmentPage';
 import { useGetClassesQuery } from '../../store/api/academicApi';
 
 const tabs = ['Classes', 'Subjects', 'Sections', 'Enrollments', 'Assignments'] as const;
@@ -16,12 +16,27 @@ const AcademicPage: React.FC = () => {
   const tabFromUrl = searchParams.get('tab') as Tab | null;
   const classFromUrl = searchParams.get('classId') || '';
 
-  const initialTab: Tab = useMemo(() => (tabs.includes((tabFromUrl as Tab) || 'Classes') ? (tabFromUrl as Tab) : 'Classes'), [tabFromUrl]);
+  const initialTab: Tab = useMemo(() => {
+    if (tabFromUrl && tabs.includes(tabFromUrl as Tab)) {
+      return tabFromUrl as Tab;
+    }
+    return 'Classes'; // Default to Classes tab
+  }, [tabFromUrl]);
+  
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [selectedClassId, setSelectedClassId] = useState<string>(classFromUrl);
 
   // সব ক্লাস লোড
   const { data: classes = [], isLoading: isClassesLoading } = useGetClassesQuery();
+
+  // Set default tab in URL if no tab is present
+  useEffect(() => {
+    if (!tabFromUrl) {
+      const params = new URLSearchParams(searchParams);
+      params.set('tab', 'Classes');
+      setSearchParams(params, { replace: true });
+    }
+  }, [tabFromUrl, searchParams, setSearchParams]);
 
   // Keep URL in sync when local state changes
   useEffect(() => {
@@ -40,17 +55,15 @@ const AcademicPage: React.FC = () => {
     }
     const newClass = searchParams.get('classId') || '';
     if (newClass !== selectedClassId) setSelectedClassId(newClass);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabFromUrl, searchParams]);
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'Classes':
-        // এখানে তোমার createClassValidation অনুযায়ী ফর্ম + লিস্ট দেখাবে
         return <ClassesPage />;
 
       case 'Subjects':
-        // classId undefined হলে সব সাবজেক্ট, আর দিলে নির্দিষ্ট ক্লাসের সাবজেক্ট
+        // classId undefined হলে সব সাললেক্ট, আর দিলে নির্দিষ্ট ক্লাসের সাললেক্ট
         return (
           <SubjectsPage classId={selectedClassId ? selectedClassId : undefined} />
         );
