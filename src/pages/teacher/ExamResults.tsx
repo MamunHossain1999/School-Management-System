@@ -1,33 +1,30 @@
 import React, { useState } from 'react';
-import { useSelector } from 'react-redux';
 import { 
   Search, 
   Filter, 
-  Save, 
+
   Edit, 
   Check, 
   X,
   Users,
-  BookOpen,
-  Calendar,
+
+ 
   Award,
   TrendingUp,
   FileText
 } from 'lucide-react';
-import type { RootState } from '../../store';
 import { 
   useGetExamsQuery,
   useGetExamResultsQuery,
   useSubmitResultMutation,
   useUpdateResultMutation,
-  type Exam,
   type Result,
   type SubmitResultRequest
 } from '../../store/api/examApi';
+import { useGetAcademicStudentsQuery } from '../../store/api/academicApi';
 import { toast } from 'react-hot-toast';
 
 const ExamResults: React.FC = () => {
-  const { user } = useSelector((state: RootState) => state.auth);
   const [selectedExam, setSelectedExam] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingResults, setEditingResults] = useState<Record<string, number>>({});
@@ -45,14 +42,30 @@ const ExamResults: React.FC = () => {
   // Get selected exam details
   const selectedExamData = exams.find(exam => exam._id === selectedExam);
 
-  // Mock students data (in real app, this would come from API)
-  const mockStudents = [
-    { _id: '1', name: 'John Doe', rollNumber: '001' },
-    { _id: '2', name: 'Jane Smith', rollNumber: '002' },
-    { _id: '3', name: 'Mike Johnson', rollNumber: '003' },
-    { _id: '4', name: 'Sarah Wilson', rollNumber: '004' },
-    { _id: '5', name: 'David Brown', rollNumber: '005' },
-  ];
+  // Load students for the selected exam's class and section
+  const { data: students = [], isLoading: studentsLoading } = useGetAcademicStudentsQuery(
+    selectedExamData ? { classId: selectedExamData.class, sectionId: selectedExamData.section } : undefined,
+    { skip: !selectedExamData }
+  );
+
+  // Minimal student shape to avoid using any
+  type StudentLike = {
+    _id: string;
+    name?: string;
+    fullName?: string;
+    profile?: { name?: string; rollNumber?: string };
+    user?: { name?: string };
+    rollNumber?: string;
+    student?: { rollNumber?: string };
+    studentId?: string;
+    userId?: string;
+  };
+
+  // Helpers to resolve student fields safely across possible shapes
+  const getStudentName = (student: StudentLike) =>
+    student?.name || student?.fullName || student?.profile?.name || student?.user?.name || 'Unknown';
+  const getStudentRoll = (student: StudentLike) =>
+    student?.rollNumber || student?.student?.rollNumber || student?.profile?.rollNumber || '';
 
   // Create results map for easy lookup
   const resultsMap = results.reduce((acc, result) => {
@@ -61,10 +74,11 @@ const ExamResults: React.FC = () => {
   }, {} as Record<string, Result>);
 
   // Filter students based on search
-  const filteredStudents = mockStudents.filter(student =>
-    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.rollNumber.includes(searchTerm)
-  );
+  const filteredStudents = (students as StudentLike[]).filter((student) => {
+    const name = getStudentName(student).toLowerCase();
+    const roll = String(getStudentRoll(student) || '');
+    return name.includes(searchTerm.toLowerCase()) || roll.includes(searchTerm);
+  });
 
   const calculateGrade = (marks: number, totalMarks: number) => {
     const percentage = (marks / totalMarks) * 100;
@@ -291,10 +305,10 @@ const ExamResults: React.FC = () => {
               </div>
             </div>
 
-            {resultsLoading ? (
+            {studentsLoading || resultsLoading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-                <p className="text-gray-500 mt-2">Loading results...</p>
+                <p className="text-gray-500 mt-2">Loading students and results...</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -325,21 +339,21 @@ const ExamResults: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredStudents.map((student) => {
-                      const result = resultsMap[student._id];
-                      const isEditing = editingResults.hasOwnProperty(student._id);
+                    {filteredStudents.map((student: StudentLike) => {
+                      const sid = student?._id || student?.studentId || student?.userId;
+                      const result = sid ? resultsMap[sid] : undefined;
+                      const isEditing = Object.prototype.hasOwnProperty.call(editingResults, student._id);
                       const currentMarks = isEditing ? editingResults[student._id] : result?.marksObtained || 0;
-                      const currentRemarks = isEditing ? editingRemarks[student._id] : result?.remarks || '';
                       const grade = selectedExamData ? calculateGrade(currentMarks, selectedExamData.totalMarks) : '';
                       const status = selectedExamData ? getStatus(currentMarks, selectedExamData.passingMarks) : '';
 
                       return (
                         <tr key={student._id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{student.name}</div>
+                            <div className="text-sm font-medium text-gray-900">{getStudentName(student)}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{student.rollNumber}</div>
+                            <div className="text-sm text-gray-900">{getStudentRoll(student) || '-'}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {isEditing ? (
@@ -401,10 +415,11 @@ const ExamResults: React.FC = () => {
                               <div className="flex items-center space-x-2">
                                 <button
                                   onClick={() => {
+                                    if (!sid) return;
                                     if (result) {
-                                      handleUpdateResult(result._id, student._id, editingResults[student._id], editingRemarks[student._id]);
+                                      handleUpdateResult(result._id, sid, editingResults[student._id], editingRemarks[student._id]);
                                     } else {
-                                      handleSubmitResult(student._id, editingResults[student._id], editingRemarks[student._id]);
+                                      handleSubmitResult(sid, editingResults[student._id], editingRemarks[student._id]);
                                     }
                                   }}
                                   disabled={isSubmitting || isUpdating}
