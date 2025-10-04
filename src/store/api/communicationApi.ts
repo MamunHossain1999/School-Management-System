@@ -5,24 +5,36 @@ export interface Notice {
   _id: string;
   title: string;
   content: string;
-  type: 'general' | 'urgent' | 'event' | 'holiday' | 'exam';
-  targetAudience: 'all' | 'students' | 'teachers' | 'parents' | 'staff';
-  class?: string;
-  section?: string;
-  isActive: boolean;
+  type: 'general' | 'important' | 'event' | 'holiday' | 'exam';
+  targetRoles: string[];
+  targetClasses?: string[];
+  targetSections?: string[];
+  priority?: 'low' | 'medium' | 'high';
+  isPublished: boolean;
   publishDate: string;
   expiryDate?: string;
   attachments?: string[];
-  createdBy: string;
+  authorId?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
+  views?: string[];
   createdAt: string;
   updatedAt: string;
-  viewedBy?: string[]; // Array of user IDs who have viewed this notice
+  // Legacy fields for backward compatibility
+  targetAudience?: 'all' | 'students' | 'teachers' | 'parents' | 'staff';
+  class?: string;
+  section?: string;
+  isActive?: boolean;
+  createdBy?: string;
+  viewedBy?: string[];
 }
 
 export interface CreateNoticeRequest {
   title: string;
   content: string;
-  type: 'general' | 'urgent' | 'event' | 'holiday' | 'exam';
+  type: 'general' | 'important' | 'event' | 'holiday' | 'exam';
   targetAudience: 'all' | 'students' | 'teachers' | 'parents' | 'staff';
   class?: string;
   section?: string;
@@ -87,11 +99,21 @@ export const communicationApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Notice endpoints
     createNotice: builder.mutation<Notice, CreateNoticeRequest>({
-      query: (noticeData) => ({
-        url: '/api/communication/notices',
-        method: 'POST',
-        body: noticeData,
-      }),
+      query: (noticeData) => {
+        console.log('Creating notice with data:', noticeData);
+        return {
+          url: '/api/notices',
+          method: 'POST',
+          body: noticeData,
+        };
+      },
+      transformResponse: (response: any) => {
+        console.log('Create notice API response:', response);
+        if (response.data) {
+          return response.data;
+        }
+        return response;
+      },
       invalidatesTags: ['Notice'],
     }),
 
@@ -102,33 +124,60 @@ export const communicationApi = baseApi.injectEndpoints({
       class?: string;
       section?: string;
     }>({
-      query: (params) => ({
-        url: '/api/communication/notices',
-        params,
-      }),
+      query: (params) => {
+        console.log('Getting notices with params:', params);
+        return {
+          url: '/api/notices',
+          params,
+        };
+      },
+      transformResponse: (response: any) => {
+        console.log('Raw Notices API Response:', response);
+        
+        // Handle nested response structure
+        if (response.data && Array.isArray(response.data.notices)) {
+          console.log('Found notices in response.data.notices:', response.data.notices);
+          return response.data.notices;
+        }
+        
+        // Handle direct array in data
+        if (response.data && Array.isArray(response.data)) {
+          console.log('Found notices in response.data (array):', response.data);
+          return response.data;
+        }
+        
+        // Handle direct array response
+        if (Array.isArray(response)) {
+          console.log('Found notices in response (direct array):', response);
+          return response;
+        }
+        
+        console.log('No notices found, returning empty array');
+        return [];
+      },
       providesTags: ['Notice'],
     }),
 
     getNoticeById: builder.query<Notice, string>({
-      query: (id) => `/api/communication/notices/${id}`,
-      providesTags: (result, error, id) => [{ type: 'Notice', id }],
+      query: (id) => `/api/notices/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'Notice', id }],
     }),
 
     updateNotice: builder.mutation<Notice, { id: string; data: UpdateNoticeRequest }>({
       query: ({ id, data }) => ({
-        url: `/api/communication/notices/${id}`,
+        url: `/api/notices/${id}`,
         method: 'PUT',
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'Notice', id }, 'Notice'],
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Notice', id }, 'Notice'],
     }),
 
     deleteNotice: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/api/communication/notices/${id}`,
+        url: `/api/notices/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, id) => [{ type: 'Notice', id }, 'Notice'],
+      invalidatesTags: (_result, _error, id) => [{ type: 'Notice', id }, 'Notice'],
     }),
 
     markNoticeAsViewed: builder.mutation<void, string>({
@@ -136,7 +185,7 @@ export const communicationApi = baseApi.injectEndpoints({
         url: `/api/communication/notices/${id}/view`,
         method: 'POST',
       }),
-      invalidatesTags: (result, error, id) => [{ type: 'Notice', id }, 'Notice'],
+      invalidatesTags: (_result, _error, id) => [{ type: 'Notice', id }, 'Notice'],
     }),
 
     // Message endpoints
@@ -167,7 +216,7 @@ export const communicationApi = baseApi.injectEndpoints({
 
     getMessageById: builder.query<Message, string>({
       query: (id) => `/api/communication/messages/${id}`,
-      providesTags: (result, error, id) => [{ type: 'Message', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Message', id }],
     }),
 
     markMessageAsRead: builder.mutation<Message, string>({
@@ -175,7 +224,7 @@ export const communicationApi = baseApi.injectEndpoints({
         url: `/api/communication/messages/${id}/read`,
         method: 'PUT',
       }),
-      invalidatesTags: (result, error, id) => [{ type: 'Message', id }, 'Message'],
+      invalidatesTags: (_result, _error, id) => [{ type: 'Message', id }, 'Message'],
     }),
 
     deleteMessage: builder.mutation<void, string>({
@@ -183,7 +232,7 @@ export const communicationApi = baseApi.injectEndpoints({
         url: `/api/communication/messages/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, id) => [{ type: 'Message', id }, 'Message'],
+      invalidatesTags: (_result, _error, id) => [{ type: 'Message', id }, 'Message'],
     }),
 
     replyToMessage: builder.mutation<Message, { id: string; data: ReplyMessageRequest }>({
