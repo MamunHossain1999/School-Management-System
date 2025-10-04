@@ -119,7 +119,7 @@ export const examApi = baseApi.injectEndpoints({
     // Exam management
     createExam: builder.mutation<Exam, CreateExamRequest>({
       query: (examData) => ({
-        url: '/exams',
+        url: '/api/exams',
         method: 'POST',
         body: examData,
       }),
@@ -128,20 +128,20 @@ export const examApi = baseApi.injectEndpoints({
 
     getExams: builder.query<Exam[], { classId?: string; subjectId?: string; isActive?: boolean }>({
       query: (params) => ({
-        url: '/exams',
+        url: '/api/exams',
         params,
       }),
       providesTags: ['Exam'],
     }),
 
     getExamById: builder.query<Exam, string>({
-      query: (id) => `/exams/${id}`,
+      query: (id) => `/api/exams/${id}`,
       providesTags: ['Exam'],
     }),
 
     updateExam: builder.mutation<Exam, { id: string; data: Partial<CreateExamRequest> }>({
       query: ({ id, data }) => ({
-        url: `/exams/${id}`,
+        url: `/api/exams/${id}`,
         method: 'PUT',
         body: data,
       }),
@@ -150,7 +150,7 @@ export const examApi = baseApi.injectEndpoints({
 
     deleteExam: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/exams/${id}`,
+        url: `/api/exams/${id}`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Exam'],
@@ -159,7 +159,7 @@ export const examApi = baseApi.injectEndpoints({
     // Result management - POST /results
     submitResult: builder.mutation<Result, SubmitResultRequest>({
       query: (resultData) => ({
-        url: '/exams/results',
+        url: '/api/exams/results',
         method: 'POST',
         body: resultData,
       }),
@@ -168,14 +168,14 @@ export const examApi = baseApi.injectEndpoints({
 
     // GET /:examId/results - Get exam results
     getExamResults: builder.query<Result[], string>({
-      query: (examId) => `/exams/${examId}/results`,
+      query: (examId) => `/api/exams/${examId}/results`,
       providesTags: ['Result'],
     }),
 
     // GET /students/me/results - Get own results (student/parent)
     getMyResults: builder.query<Result[], { startDate?: string; endDate?: string } | void>({
       query: (params) => ({
-        url: '/exams/students/me/results',
+        url: '/api/exams/students/me/results',
         params: params || {},
       }),
       providesTags: ['Result'],
@@ -183,14 +183,14 @@ export const examApi = baseApi.injectEndpoints({
 
     // GET /students/:studentId/results - Get student results
     getStudentResults: builder.query<Result[], string>({
-      query: (studentId) => `/exams/students/${studentId}/results`,
+      query: (studentId) => `/api/exams/students/${studentId}/results`,
       providesTags: ['Result'],
     }),
 
     // GET /results - Get all results (for teachers/admin)
     getResults: builder.query<Result[], { classId?: string; subjectId?: string; examId?: string }>({
       query: (params) => ({
-        url: '/exams/results',
+        url: '/api/exams/results',
         params,
       }),
       providesTags: ['Result'],
@@ -199,7 +199,7 @@ export const examApi = baseApi.injectEndpoints({
     // Update result
     updateResult: builder.mutation<Result, { id: string; data: Partial<SubmitResultRequest> }>({
       query: ({ id, data }) => ({
-        url: `/exams/results/${id}`,
+        url: `/api/exams/results/${id}`,
         method: 'PUT',
         body: data,
       }),
@@ -209,7 +209,7 @@ export const examApi = baseApi.injectEndpoints({
     // POST /report-card - Generate report card
     generateReportCard: builder.mutation<ReportCard, { studentId: string; term: string; academicYear: string }>({
       query: (data) => ({
-        url: '/exams/report-card',
+        url: '/api/exams/report-card',
         method: 'POST',
         body: data,
       }),
@@ -219,25 +219,25 @@ export const examApi = baseApi.injectEndpoints({
     // Get report cards
     getReportCards: builder.query<ReportCard[], { studentId?: string; classId?: string; term?: string }>({
       query: (params) => ({
-        url: '/exams/report-cards',
+        url: '/api/exams/report-cards',
         params,
       }),
       providesTags: ['ReportCard'],
     }),
 
     getReportCardById: builder.query<ReportCard, string>({
-      query: (id) => `/exams/report-cards/${id}`,
+      query: (id) => `/api/exams/report-cards/${id}`,
       providesTags: ['ReportCard'],
     }),
 
     // Analytics and reports
     getExamAnalytics: builder.query<ExamAnalytics, string>({
-      query: (examId) => `/exams/${examId}/analytics`,
+      query: (examId) => `/api/exams/${examId}/analytics`,
       providesTags: ['Result'],
     }),
 
     getClassPerformance: builder.query<ClassPerformance, { classId: string; examId: string }>({
-      query: ({ classId, examId }) => `/exams/analytics/class/${classId}/exam/${examId}`,
+      query: ({ classId, examId }) => `/api/exams/analytics/class/${classId}/exam/${examId}`,
       providesTags: ['Result'],
     }),
   }),

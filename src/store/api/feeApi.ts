@@ -1,4 +1,5 @@
-import type { ApiResponse } from '../../types';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { baseApi } from './baseApi';
 
 export interface FeeRecord {
@@ -83,7 +84,7 @@ export const feeApi = baseApi.injectEndpoints({
         url: '/api/fees',
         params,
       }),
-      transformResponse: (response: ApiResponse<FeeRecord[]>) => response.data,
+      transformResponse: (response: any) => Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []),
       providesTags: ['Fee'],
     }),
     
@@ -93,7 +94,7 @@ export const feeApi = baseApi.injectEndpoints({
         method: 'POST',
         body: feeData,
       }),
-      transformResponse: (response: ApiResponse<FeeRecord>) => response.data,
+      transformResponse: (response: any) => (response?.data ?? response),
       invalidatesTags: ['Fee'],
     }),
 
@@ -103,7 +104,7 @@ export const feeApi = baseApi.injectEndpoints({
         method: 'PUT',
         body: data,
       }),
-      transformResponse: (response: ApiResponse<FeeRecord>) => response.data,
+      transformResponse: (response: any) => (response?.data ?? response)?.data ?? response,
       invalidatesTags: ['Fee'],
     }),
 
@@ -112,6 +113,7 @@ export const feeApi = baseApi.injectEndpoints({
         url: `/api/fees/${id}`,
         method: 'DELETE',
       }),
+      transformResponse: (response: any) => (response?.data ?? response)?.data ?? response,
       invalidatesTags: ['Fee'],
     }),
     
@@ -122,14 +124,14 @@ export const feeApi = baseApi.injectEndpoints({
         method: 'POST',
         body: paymentData,
       }),
-      transformResponse: (response: ApiResponse<Payment>) => response.data,
+      transformResponse: (response: any) => (response?.data ?? response)?.data ?? response,
       invalidatesTags: ['Fee', 'Payment'],
     }),
 
     // GET /student/:studentId/summary
     getStudentFeeSummary: builder.query<FeeSummary, string>({
       query: (studentId) => `/api/fees/student/${studentId}/summary`,
-      transformResponse: (response: ApiResponse<FeeSummary>) => response.data,
+      transformResponse: (response: any) => (response?.data ?? response),
       providesTags: ['Fee'],
     }),
 
@@ -139,7 +141,12 @@ export const feeApi = baseApi.injectEndpoints({
         url: '/api/fees/payment-history',
         params,
       }),
-      transformResponse: (response: ApiResponse<Payment[]>) => response.data,
+      transformResponse: (response: any) => {
+        if (Array.isArray(response)) return response;
+        if (Array.isArray(response?.data)) return response.data;
+        if (Array.isArray(response?.records)) return response.records;
+        return [] as Payment[];
+      },
       providesTags: ['Payment'],
     }),
 
@@ -149,13 +156,17 @@ export const feeApi = baseApi.injectEndpoints({
         url: '/api/fees/report',
         params,
       }),
-      transformResponse: (response: ApiResponse<FeeReport>) => response.data,
+      transformResponse: (response: any) => (response?.data ?? response),
     }),
 
     // Additional helper endpoints
+    // Backend does not provide /api/fees/overdue, so query /api/fees?status=overdue
     getOverdueFees: builder.query<FeeRecord[], void>({
-      query: () => '/api/fees/overdue',
-      transformResponse: (response: ApiResponse<FeeRecord[]>) => response.data,
+      query: () => ({
+        url: '/api/fees',
+        params: { status: 'overdue' },
+      }),
+      transformResponse: (response: any) => Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []),
       providesTags: ['Fee'],
     }),
   }),

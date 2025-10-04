@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { baseApi } from './baseApi';
 
 export interface AttendanceRecord {
@@ -92,6 +93,13 @@ export const attendanceApi = baseApi.injectEndpoints({
         url: '/api/attendance',
         params: filters || {},
       }),
+      transformResponse: (response: any) => {
+        // Normalize to an array regardless of backend envelope
+        if (Array.isArray(response)) return response;
+        if (Array.isArray(response?.data)) return response.data;
+        if (Array.isArray(response?.records)) return response.records;
+        return [] as AttendanceRecord[];
+      },
       providesTags: ['Attendance'],
     }),
 
@@ -116,6 +124,13 @@ export const attendanceApi = baseApi.injectEndpoints({
         url: '/api/attendance/summary',
         params: params || {},
       }),
+      transformResponse: (response: any) => {
+        // Normalize to an array regardless of backend envelope
+        if (Array.isArray(response)) return response;
+        if (Array.isArray(response?.data)) return response.data;
+        if (Array.isArray(response?.summary)) return response.summary;
+        return [] as ClassAttendanceSummary[];
+      },
       providesTags: ['Attendance'],
     }),
 
@@ -169,6 +184,8 @@ export const attendanceApi = baseApi.injectEndpoints({
     }),
 
     // Get attendance statistics for dashboard
+    // Some backends may not expose /api/attendance/stats. We'll reuse /api/attendance/summary
+    // and transform it into the stats shape expected by the UI to avoid 404 errors.
     getAttendanceStats: builder.query<{
       totalStudents: number;
       presentToday: number;
@@ -179,9 +196,35 @@ export const attendanceApi = baseApi.injectEndpoints({
       classWiseStats: { class: string; section: string; present: number; total: number; percentage: number; }[];
     }, { date?: string } | void>({
       query: (params) => ({
-        url: '/api/attendance/stats',
+        url: '/api/attendance/summary',
         params: params || {},
       }),
+      transformResponse: (response: any) => {
+        const data: any[] = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+        const totalStudents = data.reduce((sum, c) => sum + (c.totalStudents || c.total || 0), 0);
+        const presentToday = data.reduce((sum, c) => sum + (c.presentCount || c.present || 0), 0);
+        const absentToday = data.reduce((sum, c) => sum + (c.absentCount || c.absent || 0), 0);
+        const lateToday = data.reduce((sum, c) => sum + (c.lateCount || c.late || 0), 0);
+        const avgRate = data.length > 0
+          ? (data.reduce((sum, c) => sum + (c.attendancePercentage || c.percentage || 0), 0) / data.length)
+          : 0;
+        const classWiseStats = data.map((c) => ({
+          class: c.class,
+          section: c.section,
+          present: c.presentCount || c.present || 0,
+          total: c.totalStudents || c.total || 0,
+          percentage: c.attendancePercentage || c.percentage || 0,
+        }));
+        return {
+          totalStudents,
+          presentToday,
+          absentToday,
+          lateToday,
+          attendanceRate: avgRate,
+          weeklyStats: [],
+          classWiseStats,
+        };
+      },
       providesTags: ['Attendance'],
     }),
   }),

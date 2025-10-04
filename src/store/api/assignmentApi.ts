@@ -1,16 +1,25 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { baseApi } from './baseApi';
 
 export interface Assignment {
   _id: string;
   title: string;
   description: string;
-  subject: string;
-  class: string;
-  section: string;
+  subject?: string;
+  class?: string;
+  section?: string;
   dueDate: string;
   totalMarks: number;
   attachments?: string[];
-  createdBy: string;
+  teacherId?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
+  submissionType?: string;
+  allowLateSubmission?: boolean;
+  status?: string;
+  createdBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,9 +40,9 @@ export interface AssignmentSubmission {
 export interface CreateAssignmentRequest {
   title: string;
   description: string;
-  subject: string;
-  class: string;
-  section: string;
+  subjectId: string;
+  classId: string;
+  sectionId: string;
   dueDate: string;
   totalMarks: number;
   attachments?: string[];
@@ -58,6 +67,14 @@ export const assignmentApi = baseApi.injectEndpoints({
         method: 'POST',
         body: assignmentData,
       }),
+      transformResponse: (response: any) => {
+        console.log('Create Assignment API Response:', response);
+        // Handle nested response structure
+        if (response.data) {
+          return response.data;
+        }
+        return response;
+      },
       invalidatesTags: ['Assignment'],
     }),
 
@@ -66,6 +83,30 @@ export const assignmentApi = baseApi.injectEndpoints({
         url: '/api/assignments',
         params,
       }),
+      transformResponse: (response: any) => {
+        console.log('Raw API Response for Assignments:', response);
+        
+        // Handle nested response structure: response.data.assignments
+        if (response.data && Array.isArray(response.data.assignments)) {
+          console.log('Found assignments in response.data.assignments:', response.data.assignments);
+          return response.data.assignments;
+        }
+        
+        // Check if data is direct array
+        if (response.data && Array.isArray(response.data)) {
+          console.log('Found assignments in response.data (array):', response.data);
+          return response.data;
+        }
+        
+        // Check if response itself is array
+        if (Array.isArray(response)) {
+          console.log('Found assignments in response (direct array):', response);
+          return response;
+        }
+        
+        console.log('No assignments found, returning empty array');
+        return [];
+      },
       providesTags: ['Assignment'],
     }),
 
@@ -75,6 +116,14 @@ export const assignmentApi = baseApi.injectEndpoints({
         method: 'PUT',
         body: data,
       }),
+      transformResponse: (response: any) => {
+        console.log('Update Assignment API Response:', response);
+        // Handle nested response structure
+        if (response.data) {
+          return response.data;
+        }
+        return response;
+      },
       invalidatesTags: ['Assignment'],
     }),
 

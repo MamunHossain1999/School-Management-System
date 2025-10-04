@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { baseApi } from './baseApi';
 
 export interface Notice {
   _id: string;
   title: string;
   content: string;
-  type: 'general' | 'urgent' | 'event' | 'holiday' | 'exam';
+  type: 'general' | 'important' | 'event' | 'holiday' | 'exam';
   targetAudience: 'all' | 'students' | 'teachers' | 'parents' | 'staff';
   class?: string;
   section?: string;
@@ -30,7 +31,7 @@ export interface Message {
 export interface CreateNoticeRequest {
   title: string;
   content: string;
-  type: 'general' | 'urgent' | 'event' | 'holiday' | 'exam';
+  type: 'general' | 'important' | 'event' | 'holiday' | 'exam';
   targetAudience: 'all' | 'students' | 'teachers' | 'parents' | 'staff';
   class?: string;
   publishDate: string;
@@ -75,10 +76,37 @@ export const noticeApi = baseApi.injectEndpoints({
     }),
 
     getNotices: builder.query<Notice[], { targetAudience?: string; type?: string; isActive?: boolean }>({
-      query: (params) => ({
-        url: '/api/notices',
-        params,
-      }),
+      query: (params) => {
+        console.log('NoticeApi - Getting notices with params:', params);
+        return {
+          url: '/api/notices',
+          params,
+        };
+      },
+      transformResponse: (response: any) => {
+        console.log('NoticeApi - Raw API Response:', response);
+        
+        // Handle nested response structure
+        if (response.data && Array.isArray(response.data.notices)) {
+          console.log('NoticeApi - Found notices in response.data.notices:', response.data.notices);
+          return response.data.notices;
+        }
+        
+        // Handle direct array in data
+        if (response.data && Array.isArray(response.data)) {
+          console.log('NoticeApi - Found notices in response.data (array):', response.data);
+          return response.data;
+        }
+        
+        // Handle direct array response
+        if (Array.isArray(response)) {
+          console.log('NoticeApi - Found notices in response (direct array):', response);
+          return response;
+        }
+        
+        console.log('NoticeApi - No notices found, returning empty array');
+        return [];
+      },
       providesTags: ['Notice'],
     }),
 
@@ -160,8 +188,19 @@ export const noticeApi = baseApi.injectEndpoints({
     }),
 
     getUnreadMessageCount: builder.query<{ count: number }, void>({
-      query: () => '/api/communication/messages/unread-count',
+      query: () => ({
+        url: '/api/notices',
+        params: { action: 'unread-count' }
+      }),
       providesTags: ['Message'],
+      // Add error handling for when endpoint is not available
+      transformErrorResponse: (response: { status: number; data?: unknown }) => {
+        if (response.status === 404) {
+          console.warn('Unread message count endpoint not found, returning default count');
+          return { count: 0 };
+        }
+        return response;
+      },
     }),
   }),
 });

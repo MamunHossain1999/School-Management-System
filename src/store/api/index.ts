@@ -12,3 +12,22 @@ export * from './transportApi';
 export * from './studentApi';
 export * from './teacherApi';
 export * from './settingsApi';
+export * from './rolesApi';
+
+// Export communicationApi separately to avoid conflicts
+export { 
+  communicationApi,
+  useGetUnreadMessageCountQuery as useGetUnreadMessageCountQueryFromComm,
+  useGetMessageStatsQuery as useGetMessageStatsQueryFromComm,
+  useSendMessageMutation as useSendMessageMutationFromComm,
+  useGetInboxMessagesQuery,
+  useGetSentMessagesQuery,
+  useGetMessageByIdQuery,
+  useMarkMessageAsReadMutation as useMarkMessageAsReadMutationFromComm,
+  useDeleteMessageMutation as useDeleteMessageMutationFromComm,
+  useReplyToMessageMutation,
+  useMarkMultipleMessagesAsReadMutation,
+  useDeleteMultipleMessagesMutation,
+  useSearchMessagesQuery,
+  useSearchNoticesQuery
+} from './communicationApi';

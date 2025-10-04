@@ -41,7 +41,7 @@ export const baseApi = createApi({
   tagTypes: [
     'User', 'Student', 'Teacher', 'Parent', 'Admin',
     'Class', 'Subject', 'Section', 'Assignment', 'Submission', 'Attendance', 
-    'Fee', 'Notice', 'Message', 'Exam', 'Result', 'Payment',
+    'Fee', 'Notice', 'Message', 'Exam', 'Result', 'Payment', 'Role', 'Permission',
     'Library', 'Book', 'BorrowRecord', 'LibraryMember', 'Transport', 'Route', 'Vehicle',
     'Academic', 'Timetable', 'Grade', 'Report', 'Enrollment', 'ReportCard',
     'Settings', 'UserPreferences', 'SystemHealth', 'SystemLogs'

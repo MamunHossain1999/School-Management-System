@@ -58,7 +58,7 @@ import UserManagement from "./pages/admin/UserManagement";
 import UserEdit from "./pages/admin/UserEdit";
 import UserView from "./pages/admin/UserView";
 import UserCreate from "./pages/admin/UserCreate";
-import AdminAcademi from "./pages/admin/AcademicPage";
+import AcademicPage from "./pages/admin/AcademicPage";
 import SchoolInfo from "./pages/admin/SchoolInfo";
 import AttendanceManagement from "./pages/teacher/AttendanceManagement";
 import AssignmentManagement from "./pages/teacher/AssignmentManagement";
@@ -72,6 +72,8 @@ import TeacherCommunication from "./pages/teacher/TeacherCommunication";
 import TeacherLibrary from "./pages/teacher/TeacherLibrary";
 import ClassesPage from "./pages/classAndSubject/ClassesPage";
 import SubjectsPage from "./pages/classAndSubject/SubjectsPage";
+import SectionsPage from "./pages/classAndSubject/SectionsPage";
+import EnrollmentPage from "./pages/classAndSubject/EnrollmentPage";
 import AssignmentOverview from "./pages/admin/AssignmentOverview";
 import ClassRoutine from "./pages/admin/ClassRoutine";
 import StudentAdmission from "./pages/admin/StudentAdmission";
@@ -128,9 +130,11 @@ function App() {
           <Route path="users/create" element={<UserCreate />} />
           <Route path="users/:id" element={<UserView />} />
           <Route path="users/:id/edit" element={<UserEdit />} />
-          <Route path="academic" element={<AdminAcademi />} />
+          <Route path="academic" element={<AcademicPage />} />
           <Route path="classes" element={<ClassesPage />} />
           <Route path="subjects" element={<SubjectsPage />} />
+          <Route path="sections" element={<SectionsPage />} />
+          <Route path="enrollment" element={<EnrollmentPage />} />
           <Route path="assignments" element={<AssignmentOverview />} />
           <Route path="attendance" element={<AttendanceOverview />} />
           <Route path="communication" element={<AdminCommunication />} />

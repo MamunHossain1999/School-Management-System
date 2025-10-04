@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Class API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 4px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Class API</h1>
+        <p>This tool helps debug the POST /api/academic/classes endpoint</p>
+
+        <div class="form-group">
+            <label for="apiUrl">API Base URL:</label>
+            <input type="text" id="apiUrl" value="http://localhost:5000" />
+        </div>
+
+        <div class="form-group">
+            <label for="token">Authorization Token (from cookies):</label>
+            <input type="text" id="token" placeholder="Will be auto-filled from cookies" />
+        </div>
+
+        <div class="form-group">
+            <label for="className">Class Name:</label>
+            <input type="text" id="className" value="Test Class" />
+        </div>
+
+        <div class="form-group">
+            <label for="grade">Grade (1-12):</label>
+            <input type="number" id="grade" min="1" max="12" value="10" />
+        </div>
+
+        <div class="form-group">
+            <label for="academicYear">Academic Year:</label>
+            <input type="text" id="academicYear" value="2024-2025" />
+        </div>
+
+        <!-- schoolId removed - backend will handle default school assignment -->
+        <button onclick="testCreateClass()">🧪 Test Create Class</button>
+        <button onclick="testGetClasses()">📋 Test Get Classes</button>
+        <button onclick="checkAuth()">🔐 Check Authentication</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Auto-fill token from cookies
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+
+        // Fill token field on page load
+        window.onload = function() {
+            const token = getCookie('token') || getCookie('refreshToken');
+            if (token) {
+                document.getElementById('token').value = token;
+            }
+        };
+
+        function showResult(type, title, content) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = `
+                <h3>${title}</h3>
+                <pre>${content}</pre>
+            `;
+        }
+
+        // generateObjectId function removed since schoolId is no longer needed
+
+        async function testCreateClass() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const token = document.getElementById('token').value;
+            const className = document.getElementById('className').value;
+            const grade = parseInt(document.getElementById('grade').value);
+            const academicYear = document.getElementById('academicYear').value;
+
+            const payload = {
+                name: className,
+                grade: grade,
+                academicYear: academicYear
+                // schoolId removed - backend will handle default school
+            };
+
+            showResult('info', '🔄 Testing Create Class...', `
+Request URL: ${apiUrl}/api/academic/classes
+Method: POST
+Headers: {
+  "Content-Type": "application/json",
+  "Authorization": "Bearer ${token ? token.substring(0, 20) + '...' : 'Not provided'}"
+}
+Payload: ${JSON.stringify(payload, null, 2)}
+            `);
+
+            try {
+                const response = await fetch(`${apiUrl}/api/academic/classes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const responseText = await response.text();
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch {
+                    responseData = responseText;
+                }
+
+                if (response.ok) {
+                    showResult('success', '✅ Success!', `
+Status: ${response.status} ${response.statusText}
+Response: ${JSON.stringify(responseData, null, 2)}
+                    `);
+                } else {
+                    showResult('error', '❌ Error!', `
+Status: ${response.status} ${response.statusText}
+Response: ${JSON.stringify(responseData, null, 2)}
+                    `);
+                }
+            } catch (error) {
+                showResult('error', '❌ Network Error!', `
+Error: ${error.message}
+This usually means:
+1. Backend server is not running
+2. CORS issues
+3. Network connectivity problems
+                `);
+            }
+        }
+
+        async function testGetClasses() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const token = document.getElementById('token').value;
+
+            showResult('info', '🔄 Testing Get Classes...', `
+Request URL: ${apiUrl}/api/academic/classes
+Method: GET
+            `);
+
+            try {
+                const response = await fetch(`${apiUrl}/api/academic/classes`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    }
+                });
+
+                const responseText = await response.text();
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch {
+                    responseData = responseText;
+                }
+
+                if (response.ok) {
+                    showResult('success', '✅ Get Classes Success!', `
+Status: ${response.status} ${response.statusText}
+Classes Found: ${Array.isArray(responseData?.data) ? responseData.data.length : 'Unknown'}
+Response: ${JSON.stringify(responseData, null, 2)}
+                    `);
+                } else {
+                    showResult('error', '❌ Get Classes Error!', `
+Status: ${response.status} ${response.statusText}
+Response: ${JSON.stringify(responseData, null, 2)}
+                    `);
+                }
+            } catch (error) {
+                showResult('error', '❌ Network Error!', error.message);
+            }
+        }
+
+        async function checkAuth() {
+            const token = document.getElementById('token').value;
+            
+            if (!token) {
+                showResult('error', '❌ No Token Found!', `
+No authentication token found in cookies.
+Please make sure you're logged in to the application.
+
+Cookies found: ${document.cookie || 'None'}
+                `);
+                return;
+            }
+
+            // Try to decode JWT token (basic info only)
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                showResult('success', '✅ Token Found!', `
+Token: ${token.substring(0, 50)}...
+Decoded Payload: ${JSON.stringify(payload, null, 2)}
+                `);
+            } catch (error) {
+                showResult('error', '❌ Invalid Token!', `
+Token appears to be invalid or malformed.
+Token: ${token}
+Error: ${error.message}
+                `);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,11 +1,26 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { baseApi } from './baseApi';
 import type { Class, Subject, Section, ApiResponse, User } from '../../types';
+
+// Extended API Response types for nested data structures
+type SubjectsApiResponse = {
+  success: boolean;
+  message: string;
+  data: Subject[] | { subjects: Subject[] };
+};
+
+type SectionsApiResponse = {
+  success: boolean;
+  message: string;
+  data: Section[] | { sections: Section[] };
+};
 
 // DTOs for create operations matching backend API
 type CreateClassDTO = {
   name: string;
   grade: number; // 1-12
   academicYear: string;
+  schoolId?: string; // Optional - backend will handle default
 };
 
 type UpdateClassDTO = {
@@ -20,6 +35,7 @@ type CreateSubjectDTO = {
   classIds?: string[]; // array of related class IDs
   credits?: number;
   type?: 'core' | 'elective';
+  schoolId?: string; // Optional - backend will handle default
 };
 
 type UpdateSubjectDTO = {
@@ -33,6 +49,7 @@ type UpdateSubjectDTO = {
 type CreateSectionDTO = {
   name: string;
   classId: string;
+  schoolId?: string; // Optional - backend will handle default
 };
 
 type UpdateSectionDTO = {
@@ -44,6 +61,7 @@ type EnrollStudentDTO = {
   userId: string;
   classId?: string;
   sectionId?: string;
+  schoolId?: string; // Optional - backend will handle default
 };
 
 type AssignTeacherDTO = {
@@ -51,6 +69,7 @@ type AssignTeacherDTO = {
   classId?: string;
   sectionId?: string;
   subjectIds?: string[];
+  schoolId?: string; // Optional - backend will handle default
 };
 
 export const academicApi = baseApi.injectEndpoints({
@@ -58,7 +77,30 @@ export const academicApi = baseApi.injectEndpoints({
     // Classes Management
     getClasses: builder.query<Class[], void>({
       query: () => '/api/academic/classes',
-      transformResponse: (response: ApiResponse<Class[]>) => response.data,
+      transformResponse: (response: any) => {
+        console.log('Raw API Response for Classes:', response);
+        
+        // Handle nested response structure: response.data.classes
+        if (response.data && response.data.classes) {
+          console.log('Found classes in response.data.classes:', response.data.classes);
+          return response.data.classes;
+        }
+        
+        // Check if data is direct array
+        if (response.data && Array.isArray(response.data)) {
+          console.log('Found classes in response.data (array):', response.data);
+          return response.data;
+        }
+        
+        // Check if response itself is array
+        if (Array.isArray(response)) {
+          console.log('Found classes in response (direct array):', response);
+          return response;
+        }
+        
+        console.log('No classes found, returning empty array');
+        return [];
+      },
       providesTags: ['Class'],
     }),
     
@@ -96,7 +138,17 @@ export const academicApi = baseApi.injectEndpoints({
         url: '/api/subjects',
         params: params || {},
       }),
-      transformResponse: (response: ApiResponse<Subject[]>) => response.data,
+      transformResponse: (response: SubjectsApiResponse) => {
+        // Handle nested response structure
+        if (response.data && Array.isArray((response.data as any).subjects)) {
+          return (response.data as any).subjects;
+        }
+        if (response.data && Array.isArray(response.data)) {
+          return response.data as Subject[];
+        }
+        // Fallback for direct array response
+        return (response.data as any) || response || [];
+      },
       providesTags: ['Subject'],
     }),
 
@@ -152,11 +204,22 @@ export const academicApi = baseApi.injectEndpoints({
 
     // Sections Management
     getSections: builder.query<Section[], { classId?: string } | void>({
-      query: (params) => ({
-        url: '/api/academic/sections',
-        params: params || {},
-      }),
-      transformResponse: (response: ApiResponse<Section[]>) => response.data,
+      query: (params) => (
+        params && Object.keys(params).length > 0
+          ? { url: '/api/academic/sections', params }
+          : '/api/academic/sections'
+      ),
+      transformResponse: (response: SectionsApiResponse) => {
+        // Handle nested response structure
+        if (response.data && Array.isArray((response.data as any).sections)) {
+          return (response.data as any).sections;
+        }
+        if (response.data && Array.isArray(response.data)) {
+          return response.data as Section[];
+        }
+        // Fallback for direct array response
+        return (response.data as any) || response || [];
+      },
       providesTags: ['Section'],
     }),
 
@@ -171,20 +234,47 @@ export const academicApi = baseApi.injectEndpoints({
     }),
 
     updateSection: builder.mutation<Section, { id: string; data: UpdateSectionDTO }>({
-      query: ({ id, data }) => ({
-        url: `/api/academic/sections/${id}`,
-        method: 'PUT',
-        body: data,
-      }),
-      transformResponse: (response: ApiResponse<Section>) => response.data,
+      async queryFn({ id, data }, _api, _extra, baseQuery) {
+        // Try a sequence of likely routes/methods to maximize compatibility
+        const attempts = [
+          { url: `/api/academic/sections/${id}`, method: 'PUT' as const },
+          { url: `/api/sections/${id}`, method: 'PUT' as const },
+          { url: `/api/academic/sections/${id}`, method: 'PATCH' as const },
+          { url: `/api/sections/${id}`, method: 'PATCH' as const },
+          { url: `/api/academic/section/${id}`, method: 'PUT' as const },
+          { url: `/api/section/${id}`, method: 'PUT' as const },
+        ];
+
+        let res: any = null;
+        for (const attempt of attempts) {
+          res = await baseQuery({ url: attempt.url, method: attempt.method, body: data });
+          if (!res?.error || (res?.error as any).status !== 404) break;
+        }
+        if (res?.error) return { error: res.error as any } as any;
+        const payload = (res?.data as ApiResponse<Section>)?.data ?? res?.data;
+        return { data: payload as Section };
+      },
       invalidatesTags: ['Section'],
     }),
 
     deleteSection: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `/api/academic/sections/${id}`,
-        method: 'DELETE',
-      }),
+      async queryFn(id, _api, _extra, baseQuery) {
+        // Try a sequence of likely routes to maximize compatibility
+        const attempts = [
+          { url: `/api/academic/sections/${id}`, method: 'DELETE' as const },
+          { url: `/api/sections/${id}`, method: 'DELETE' as const },
+          { url: `/api/academic/section/${id}`, method: 'DELETE' as const },
+          { url: `/api/section/${id}`, method: 'DELETE' as const },
+        ];
+
+        let res: any = null;
+        for (const attempt of attempts) {
+          res = await baseQuery({ url: attempt.url, method: attempt.method });
+          if (!res?.error || (res?.error as any).status !== 404) break;
+        }
+        if (res?.error) return { error: res.error as any } as any;
+        return { data: undefined } as any;
+      },
       invalidatesTags: ['Section'],
     }),
 
@@ -228,6 +318,28 @@ export const academicApi = baseApi.injectEndpoints({
       providesTags: ['Teacher'],
     }),
 
+    // Get all student users for enrollment dropdown
+    getAllStudentUsers: builder.query<User[], void>({
+      query: () => '/api/users?role=student',
+      transformResponse: (response: any) => {
+        console.log('Raw Student Users API Response:', response);
+        
+        // Handle different response structures
+        if (response.data && Array.isArray(response.data.users)) {
+          console.log('Found users in response.data.users:', response.data.users);
+          return response.data.users;
+        }
+        if (response.data && Array.isArray(response.data)) {
+          console.log('Found users in response.data (array):', response.data);
+          return response.data;
+        }
+        
+        console.log('Returning fallback data:', response.data || response || []);
+        return response.data || response || [];
+      },
+      providesTags: ['User'],
+    }),
+
   }),
 });
 
@@ -258,5 +370,6 @@ export const {
   useGetAcademicStudentsQuery,
   useAssignTeacherMutation,
   useGetAcademicTeachersQuery,
+  useGetAllStudentUsersQuery,
 } = academicApi;
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { baseApi } from './baseApi';
 
 export interface Book {
@@ -120,6 +121,22 @@ export interface LibraryMember {
   updatedAt: string;
 }
 
+// Strongly-typed response for GET /api/library/books
+interface BooksListResponse {
+  success: boolean;
+  message: string;
+  data:
+    | Book[]
+    | {
+        books: Book[];
+        pagination?: {
+          currentPage: number;
+          totalPages: number;
+          total: number;
+        };
+      };
+}
+
 export const libraryApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // POST /api/library/books - Add book (Admin)
@@ -129,6 +146,7 @@ export const libraryApi = baseApi.injectEndpoints({
         method: 'POST',
         body: bookData,
       }),
+      transformResponse: (response: { data?: Book } | Book) => ((response as any)?.data ?? response) as Book,
       invalidatesTags: ['Book', 'Library'],
     }),
 
@@ -146,12 +164,32 @@ export const libraryApi = baseApi.injectEndpoints({
         url: '/api/library/books',
         params,
       }),
+      transformResponse: (response: BooksListResponse | Book[] | { data: Book[] }) => {
+        // Support nested API shapes
+        const r = response as BooksListResponse;
+        const anyResp = response as { data?: unknown };
+        if (typeof r === 'object' && r !== null && 'data' in r) {
+          const d = (r as BooksListResponse).data as unknown;
+          if (d && typeof d === 'object' && 'books' in (d as any)) {
+            const books = (d as { books: Book[] }).books;
+            return Array.isArray(books) ? books : [];
+          }
+        }
+        if (anyResp?.data && Array.isArray(anyResp.data)) {
+          return anyResp.data as Book[];
+        }
+        if (Array.isArray(response)) {
+          return response as Book[];
+        }
+        return [];
+      },
       providesTags: ['Book'],
     }),
 
     // GET /api/library/books/:id - Get book by ID
     getBookById: builder.query<Book, string>({
       query: (id) => `/api/library/books/${id}`,
+      transformResponse: (response: { data?: Book } | Book) => (response && (response as any).data) ? (response as any).data as Book : response as Book,
       providesTags: ['Book'],
     }),
 
@@ -181,6 +219,7 @@ export const libraryApi = baseApi.injectEndpoints({
         method: 'POST',
         body: borrowData,
       }),
+      transformResponse: (response: { data?: BorrowRecord } | BorrowRecord) => (response && (response as any).data) ? (response as any).data as BorrowRecord : response as BorrowRecord,
       invalidatesTags: ['BorrowRecord', 'Book', 'Library'],
     }),
 
@@ -191,6 +230,7 @@ export const libraryApi = baseApi.injectEndpoints({
         method: 'PUT',
         body: data,
       }),
+      transformResponse: (response: { data?: BorrowRecord } | BorrowRecord) => (response && (response as any).data) ? (response as any).data as BorrowRecord : response as BorrowRecord,
       invalidatesTags: ['BorrowRecord', 'Book', 'Library'],
     }),
 
@@ -206,6 +246,13 @@ export const libraryApi = baseApi.injectEndpoints({
         url: '/api/library/borrowed',
         params,
       }),
+      transformResponse: (response: { data?: BorrowRecord[] | { records?: BorrowRecord[] } } | BorrowRecord[]) => {
+        const anyResp = response as any;
+        if (anyResp?.data?.records && Array.isArray(anyResp.data.records)) return anyResp.data.records as BorrowRecord[];
+        if (anyResp?.data && Array.isArray(anyResp.data)) return anyResp.data as BorrowRecord[];
+        if (Array.isArray(response)) return response as BorrowRecord[];
+        return [];
+      },
       providesTags: ['BorrowRecord'],
     }),
 
@@ -219,6 +266,12 @@ export const libraryApi = baseApi.injectEndpoints({
         url: '/api/library/overdue',
         params,
       }),
+      transformResponse: (response: { data?: BorrowRecord[] } | BorrowRecord[]) => {
+        const anyResp = response as any;
+        if (anyResp?.data && Array.isArray(anyResp.data)) return anyResp.data as BorrowRecord[];
+        if (Array.isArray(response)) return response as BorrowRecord[];
+        return [];
+      },
       providesTags: ['BorrowRecord'],
     }),
 
@@ -232,6 +285,7 @@ export const libraryApi = baseApi.injectEndpoints({
         url: '/api/library/stats',
         params,
       }),
+      transformResponse: (response: { data?: LibraryStats } | LibraryStats) => (response && (response as any).data) ? (response as any).data as LibraryStats : response as LibraryStats,
       providesTags: ['Library'],
     }),
 
@@ -239,6 +293,7 @@ export const libraryApi = baseApi.injectEndpoints({
     // GET /api/library/categories - Get book categories
     getBookCategories: builder.query<string[], void>({
       query: () => '/api/library/categories',
+      transformResponse: (response: { data?: string[] } | string[]) => (response && (response as any).data) ? (response as any).data as string[] : response as string[],
       providesTags: ['Book'],
     }),
 
@@ -248,6 +303,7 @@ export const libraryApi = baseApi.injectEndpoints({
         url: '/api/library/authors',
         params,
       }),
+      transformResponse: (response: { data?: string[] } | string[]) => (response && (response as any).data) ? (response as any).data as string[] : response as string[],
       providesTags: ['Book'],
     }),
 
@@ -263,6 +319,13 @@ export const libraryApi = baseApi.injectEndpoints({
         url: '/api/library/members',
         params,
       }),
+      transformResponse: (response: { data?: LibraryMember[] | { members?: LibraryMember[] } } | LibraryMember[]) => {
+        const anyResp = response as any;
+        if (anyResp?.data?.members && Array.isArray(anyResp.data.members)) return anyResp.data.members as LibraryMember[];
+        if (anyResp?.data && Array.isArray(anyResp.data)) return anyResp.data as LibraryMember[];
+        if (Array.isArray(response)) return response as LibraryMember[];
+        return [];
+      },
       providesTags: ['LibraryMember'],
     }),
 
@@ -283,6 +346,7 @@ export const libraryApi = baseApi.injectEndpoints({
         method: 'POST',
         body: memberData,
       }),
+      transformResponse: (response: { data?: LibraryMember } | LibraryMember) => (response && (response as any).data) ? (response as any).data as LibraryMember : response as LibraryMember,
       invalidatesTags: ['LibraryMember'],
     }),
 
@@ -315,6 +379,12 @@ export const libraryApi = baseApi.injectEndpoints({
         url: `/api/library/members/${memberId}/history`,
         params,
       }),
+      transformResponse: (response: { data?: BorrowRecord[] } | BorrowRecord[]) => {
+        const anyResp = response as any;
+        if (anyResp?.data && Array.isArray(anyResp.data)) return anyResp.data as BorrowRecord[];
+        if (Array.isArray(response)) return response as BorrowRecord[];
+        return [];
+      },
       providesTags: ['BorrowRecord'],
     }),
 
@@ -329,6 +399,7 @@ export const libraryApi = baseApi.injectEndpoints({
         method: 'PUT',
         body: { newDueDate, notes },
       }),
+      transformResponse: (response: { data?: BorrowRecord } | BorrowRecord) => (response && (response as any).data) ? (response as any).data as BorrowRecord : response as BorrowRecord,
       invalidatesTags: ['BorrowRecord'],
     }),
 
@@ -348,30 +419,39 @@ export const libraryApi = baseApi.injectEndpoints({
     }),
 
     // GET /api/library/reservations - Get reservations
-    getReservations: builder.query<Array<{
-      _id: string;
-      book: Book;
-      borrower: string;
-      borrowerType: string;
-      reservationDate: string;
-      status: 'active' | 'fulfilled' | 'cancelled';
-      notes?: string;
-    }>, { 
-      borrowerId?: string;
-      status?: string;
-      page?: number;
-      limit?: number;
-    }>({
+    getReservations: builder.query<
+      Array<{
+        _id: string;
+        book: Book;
+        borrower: string;
+        borrowerType: string;
+        reservationDate: string;
+        status: 'active' | 'fulfilled' | 'cancelled';
+        notes?: string;
+      }>,
+      { borrowerId?: string; status?: string; page?: number; limit?: number }
+    >({
       query: (params) => ({
         url: '/api/library/reservations',
         params,
       }),
+      transformResponse: (
+        response:
+          | { data?: any[] | { reservations?: any[] } }
+          | any[]
+      ) => {
+        const anyResp = response as any;
+        if (anyResp?.data?.reservations && Array.isArray(anyResp.data.reservations)) return anyResp.data.reservations as any[];
+        if (anyResp?.data && Array.isArray(anyResp.data)) return anyResp.data as any[];
+        if (Array.isArray(response)) return response as any[];
+        return [];
+      },
       providesTags: ['Library'],
     }),
 
     // PUT /api/library/fine/:borrowId - Pay fine
     payFine: builder.mutation<BorrowRecord, { 
-      borrowId: string; 
+      borrowId: string;
       amount: number;
       paymentMethod: string;
       transactionId?: string;
@@ -381,6 +461,7 @@ export const libraryApi = baseApi.injectEndpoints({
         method: 'PUT',
         body: data,
       }),
+      transformResponse: (response: { data?: BorrowRecord } | BorrowRecord) => (response && (response as any).data) ? (response as any).data as BorrowRecord : response as BorrowRecord,
       invalidatesTags: ['BorrowRecord', 'LibraryMember'],
     }),
 
@@ -397,6 +478,7 @@ export const libraryApi = baseApi.injectEndpoints({
         url: '/api/library/reports/popular',
         params,
       }),
+      transformResponse: (response: { data?: any[] } | any[]) => (response && (response as any).data) ? (response as any).data as any[] : response as any[],
       providesTags: ['Library'],
     }),
 
@@ -414,6 +496,7 @@ export const libraryApi = baseApi.injectEndpoints({
         url: '/api/library/reports/defaulters',
         params,
       }),
+      transformResponse: (response: { data?: any[] } | any[]) => (response && (response as any).data) ? (response as any).data as any[] : response as any[],
       providesTags: ['BorrowRecord', 'LibraryMember'],
     }),
   }),

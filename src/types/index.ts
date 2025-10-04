@@ -158,7 +158,7 @@ export interface Notice {
   id: string;
   title: string;
   content: string;
-  type: 'general' | 'urgent' | 'academic' | 'event';
+  type: 'general' | 'important' | 'academic' | 'event';
   targetAudience: ('admin' | 'teacher' | 'student' | 'parent')[];
   publishedBy: string;
   publishedAt: string;
