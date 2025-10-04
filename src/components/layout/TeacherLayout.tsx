@@ -21,6 +21,7 @@ import type { RootState } from '../../store';
 import type { AppDispatch } from '../../store';
 import { logoutUser } from '../../store/slices/authSlice';
 import ProfileDropdown from '../common/ProfileDropdown';
+import { PageContainer } from '../common/Responsive';
 import toast from 'react-hot-toast';
 import { useGetUnreadMessageCountQuery } from '../../store/api/noticeApi';
 import { routes } from '../../routes';
@@ -31,8 +32,16 @@ const TeacherLayout: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { data: unreadData } = useGetUnreadMessageCountQuery();
-  const unreadCount = typeof unreadData?.count === 'number' ? unreadData.count : 0;
+  // Unread messages badge (communication) - Temporarily disabled until backend is ready
+  const { error } = useGetUnreadMessageCountQuery(undefined, {
+    skip: true // Skip the query until backend endpoint is implemented
+  });
+  const unreadCount = 0; // Default to 0 until backend is ready
+  
+  // Log error for debugging if endpoint is not found
+  if (error) {
+    console.warn('Unread message count endpoint not available:', error);
+  }
 
   const menuItems = [
     { path: routes.teacher.dashboard, icon: Home, label: 'Dashboard' },
@@ -176,8 +185,10 @@ const TeacherLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto">
+          <PageContainer>
+            <Outlet />
+          </PageContainer>
         </main>
       </div>
 
