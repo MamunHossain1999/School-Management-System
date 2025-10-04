@@ -28,6 +28,10 @@ const UserManagement: React.FC = () => {
   const [page, setPage] = useState(1);
   const limit = 10;
 
+  // Confirmation popup states (only for activate/deactivate)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<User | null>(null);
+  const [showActivateConfirm, setShowActivateConfirm] = useState<User | null>(null);
+
   // Debounce search to avoid spamming requests
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
@@ -63,16 +67,15 @@ const UserManagement: React.FC = () => {
   });
 
   const handleDeactivateUser = async (userId: string) => {
-    if (window.confirm("Are you sure you want to deactivate this user?")) {
-      try {
-        setActingUserId(userId);
-        await deactivateUser(userId).unwrap();
-        toast.success("User deactivated successfully");
-      } catch (error: any) {
-        toast.error(error?.message || "Failed to deactivate user");
-      } finally {
-        setActingUserId(null);
-      }
+    // Confirmation is handled via the custom modal (showDeactivateConfirm)
+    try {
+      setActingUserId(userId);
+      await deactivateUser(userId).unwrap();
+      toast.success("User deactivated successfully");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to deactivate user");
+    } finally {
+      setActingUserId(null);
     }
   };
 
@@ -337,23 +340,23 @@ const UserManagement: React.FC = () => {
                         <div className="flex items-center justify-end space-x-2">
                           <button
                             onClick={() => handleEditUser(user)}
-                            className="text-primary-600 hover:text-primary-900"
-                            title="Edit"
+                            className="inline-flex items-center px-2 py-1 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
+                            title="Edit User"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleViewUser(user)}
-                            className="text-gray-600 hover:text-gray-900"
-                            title="View"
+                            className="inline-flex items-center px-2 py-1 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-colors"
+                            title="View User"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           {user.isActive ? (
                             <button
-                              onClick={() => handleDeactivateUser(userId)}
-                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                              title="Deactivate"
+                              onClick={() => setShowDeactivateConfirm(user)}
+                              className="inline-flex items-center px-2 py-1 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 transition-colors"
+                              title="Deactivate User"
                               disabled={
                                 actingUserId === userId ||
                                 isDeactivating ||
@@ -364,9 +367,9 @@ const UserManagement: React.FC = () => {
                             </button>
                           ) : (
                             <button
-                              onClick={() => handleActivateUser(userId)}
-                              className="text-green-600 hover:text-green-900 disabled:opacity-50"
-                              title="Activate"
+                              onClick={() => setShowActivateConfirm(user)}
+                              className="inline-flex items-center px-2 py-1 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 hover:border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors"
+                              title="Activate User"
                               disabled={
                                 actingUserId === userId ||
                                 isActivating ||
@@ -433,6 +436,107 @@ const UserManagement: React.FC = () => {
           </div>
         </div>
       </div>
+
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white">
+              <div className="flex items-center space-x-3">
+                <Trash2 className="w-5 h-5" />
+                <h3 className="text-lg font-semibold">Deactivate User</h3>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Are you sure you want to deactivate this user?
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  <strong>{showDeactivateConfirm.firstName} {showDeactivateConfirm.lastName}</strong>
+                </p>
+                <p className="text-sm text-gray-500">
+                  The user will lose access to the system but their data will be preserved.
+                </p>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowDeactivateConfirm(null)}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const userId = showDeactivateConfirm._id || (showDeactivateConfirm as any).id;
+                    if (userId) {
+                      handleDeactivateUser(userId);
+                      setShowDeactivateConfirm(null);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 transition-colors"
+                >
+                  Deactivate User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activate Confirmation Modal */}
+      {showActivateConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white">
+              <div className="flex items-center space-x-3">
+                <UserPlus className="w-5 h-5" />
+                <h3 className="text-lg font-semibold">Activate User</h3>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mb-4">
+                  <UserPlus className="w-6 h-6 text-green-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Are you sure you want to activate this user?
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  <strong>{showActivateConfirm.firstName} {showActivateConfirm.lastName}</strong>
+                </p>
+                <p className="text-sm text-gray-500">
+                  The user will regain access to the system.
+                </p>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowActivateConfirm(null)}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const userId = showActivateConfirm._id || (showActivateConfirm as any).id;
+                    if (userId) {
+                      handleActivateUser(userId);
+                      setShowActivateConfirm(null);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors"
+                >
+                  Activate User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
