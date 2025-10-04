@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCreateStudentMutation, useCreateTeacherMutation, useCreateAdminMutation } from '../../store/api/userApi';
+import { useGetClassesQuery, useGetSectionsQuery } from '../../store/api/academicApi';
 import type { User } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -20,7 +21,22 @@ const UserCreate: React.FC = () => {
     phone: '',
     password: '',
     role: 'student' as string,
+    // student-specific
+    rollNumber: '',
+    classId: '',
+    sectionId: '',
   });
+
+  // Load classes and sections for student role
+  const { data: classes = [] } = useGetClassesQuery();
+  const { data: sections = [] } = useGetSectionsQuery(
+    form.classId ? { classId: form.classId } : undefined
+  );
+
+  // Reset section when class changes
+  useEffect(() => {
+    setForm((prev) => ({ ...prev, sectionId: '' }));
+  }, [form.classId]);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -43,7 +59,22 @@ const UserCreate: React.FC = () => {
       } else if (form.role === 'teacher') {
         await createTeacher(payload).unwrap();
       } else if (form.role === 'student') {
-        await createStudent(payload).unwrap();
+        if (!form.rollNumber) {
+          toast.error('Roll number is required for students');
+          return;
+        }
+        if (!form.classId) {
+          toast.error('Class is required for students');
+          return;
+        }
+        // sectionId optional; some schools may not use sections
+        const studentPayload = {
+          ...payload,
+          rollNumber: form.rollNumber.trim(),
+          classId: form.classId,
+          sectionId: form.sectionId || undefined,
+        } as any;
+        await createStudent(studentPayload).unwrap();
       } else {
         toast.error('Unsupported role');
         return;
@@ -162,6 +193,57 @@ const UserCreate: React.FC = () => {
             minLength={6}
           />
         </div>
+
+        {/* Student specific fields */}
+        {form.role === 'student' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Roll Number</label>
+              <input
+                name="rollNumber"
+                value={form.rollNumber}
+                onChange={onChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Roll number"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+              <select
+                name="classId"
+                value={form.classId}
+                onChange={onChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                required
+              >
+                <option value="">Select Class</option>
+                {classes.map((c: any) => (
+                  <option key={c._id || c.id} value={c._id || c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Section (Optional)</label>
+              <select
+                name="sectionId"
+                value={form.sectionId}
+                onChange={onChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                disabled={!form.classId}
+              >
+                <option value="">Select Section</option>
+                {sections.map((s: any) => (
+                  <option key={s._id || s.id} value={s._id || s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
       </form>
     </div>
   );
