@@ -10,6 +10,7 @@ import {
   useGetNoticeStatsQuery,
   useGetNoticePriorityQuery,
 } from '../../store/api/noticeApi';
+import { Edit2, Trash2, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const NoticeBoard: React.FC = () => {
@@ -36,6 +37,9 @@ const NoticeBoard: React.FC = () => {
   // Edit modal state
   const [editing, setEditing] = useState<Notice | null>(null);
   const [editForm, setEditForm] = useState<UpdateNoticeRequest>({});
+  
+  // Delete confirmation modal state
+  const [deleteConfirm, setDeleteConfirm] = useState<Notice | null>(null);
 
   const canSubmit = useMemo(() => form.title.trim().length > 0 && form.content.trim().length > 0, [form]);
 
@@ -74,14 +78,20 @@ const NoticeBoard: React.FC = () => {
     }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm('Delete this notice?')) return;
+  const handleDeleteClick = (notice: Notice) => {
+    setDeleteConfirm(notice);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    
     try {
-      await deleteNotice(id).unwrap();
-      toast.success('Notice deleted');
+      await deleteNotice(deleteConfirm._id).unwrap();
+      toast.success('Notice deleted successfully');
+      setDeleteConfirm(null);
       void refetch();
     } catch (e: unknown) {
-      const msg = (e as { data?: { message?: string } })?.data?.message || 'Failed to delete';
+      const msg = (e as { data?: { message?: string } })?.data?.message || 'Failed to delete notice';
       toast.error(msg);
     }
   };
@@ -190,7 +200,7 @@ const NoticeBoard: React.FC = () => {
             className="border p-2 rounded"
           >
             <option value="general">General</option>
-            <option value="urgent">Urgent</option>
+            <option value="important">Important</option>
             <option value="event">Event</option>
             <option value="holiday">Holiday</option>
             <option value="exam">Exam</option>
@@ -324,16 +334,51 @@ const NoticeBoard: React.FC = () => {
                       {n.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-6 py-2 space-x-2">
-                    <button onClick={() => openEdit(n)} className="px-2 py-1 border rounded">
-                      Edit
-                    </button>
-                    <button onClick={() => void toggleActive(n)} className="px-2 py-1 border rounded">
-                      {n.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button onClick={() => remove(n._id)} className="px-2 py-1 border rounded text-red-600">
-                      Delete
-                    </button>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center space-x-2">
+                      {/* Edit Button */}
+                      <button 
+                        onClick={() => openEdit(n)}
+                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
+                        title="Edit Notice"
+                      >
+                        <Edit2 className="w-4 h-4 mr-1" />
+                        Edit
+                      </button>
+                      
+                      {/* Toggle Active/Inactive Button */}
+                      <button 
+                        onClick={() => void toggleActive(n)}
+                        className={`inline-flex items-center px-3 py-1.5 text-sm font-medium border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors ${
+                          n.isActive 
+                            ? 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100 hover:border-orange-300 focus:ring-orange-500' 
+                            : 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100 hover:border-green-300 focus:ring-green-500'
+                        }`}
+                        title={n.isActive ? 'Deactivate Notice' : 'Activate Notice'}
+                      >
+                        {n.isActive ? (
+                          <>
+                            <EyeOff className="w-4 h-4 mr-1" />
+                            Deactivate
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-4 h-4 mr-1" />
+                            Activate
+                          </>
+                        )}
+                      </button>
+                      
+                      {/* Delete Button */}
+                      <button 
+                        onClick={() => handleDeleteClick(n)}
+                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 transition-colors"
+                        title="Delete Notice"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )) : (
@@ -348,12 +393,26 @@ const NoticeBoard: React.FC = () => {
 
       {/* Edit Modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-2xl rounded-lg shadow p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Edit Notice</h3>
-              <button onClick={() => setEditing(null)} className="text-gray-500 hover:text-gray-700">✕</button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+              <div className="flex items-center space-x-3">
+                <Edit2 className="w-5 h-5" />
+                <h3 className="text-lg font-semibold">Edit Notice</h3>
+              </div>
+              <button 
+                onClick={() => setEditing(null)} 
+                className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <input
                 value={editForm.title || ''}
@@ -367,7 +426,7 @@ const NoticeBoard: React.FC = () => {
                 className="border p-2 rounded"
               >
                 <option value="general">General</option>
-                <option value="urgent">Urgent</option>
+                <option value="important">Important</option>
                 <option value="event">Event</option>
                 <option value="holiday">Holiday</option>
                 <option value="exam">Exam</option>
@@ -414,6 +473,56 @@ const NoticeBoard: React.FC = () => {
               >
                 {updating ? 'Updating...' : 'Save Changes'}
               </button>
+            </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white">
+              <div className="flex items-center space-x-3">
+                <Trash2 className="w-5 h-5" />
+                <h3 className="text-lg font-semibold">Delete Notice</h3>
+              </div>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Are you sure you want to delete this notice?
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  <strong>"{deleteConfirm.title}"</strong>
+                </p>
+                <p className="text-sm text-gray-500">
+                  This action cannot be undone. The notice will be permanently removed from the system.
+                </p>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 transition-colors"
+                >
+                  Delete Notice
+                </button>
+              </div>
             </div>
           </div>
         </div>
