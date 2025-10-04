@@ -32,7 +32,7 @@ const AdminDashboard: React.FC = () => {
   const [noticeForm, setNoticeForm] = useState({
     title: '',
     content: '',
-    type: 'general' as 'general' | 'urgent' | 'event' | 'holiday' | 'exam',
+    type: 'general' as 'general' | 'important' | 'event' | 'holiday' | 'exam',
     targetAudience: 'all' as 'all' | 'students' | 'teachers' | 'parents' | 'staff',
     publishDate: new Date().toISOString().slice(0, 10),
     expiryDate: ''
@@ -55,14 +55,28 @@ const AdminDashboard: React.FC = () => {
   );
   const [createNotice, { isLoading: isCreatingNotice }] = useCreateNoticeMutation();
   const notices = useMemo(() => {
+    console.log('AdminDashboard Notices Debug:', {
+      noticesLoading,
+      isError,
+      error,
+      noticesData,
+      noticesDataType: typeof noticesData,
+      isArray: Array.isArray(noticesData)
+    });
+    
     // Support both array and wrapped API responses like { data: Notice[] }
-    if (Array.isArray(noticesData)) return noticesData;
+    if (Array.isArray(noticesData)) {
+      console.log('Notices found as direct array:', noticesData);
+      return noticesData;
+    }
     if (noticesData && typeof noticesData === 'object' && 'data' in (noticesData as any)) {
       const inner = (noticesData as any).data;
+      console.log('Notices found in data property:', inner);
       return Array.isArray(inner) ? inner : [];
     }
+    console.log('No notices found, returning empty array');
     return [];
-  }, [noticesData]);
+  }, [noticesData, noticesLoading, isError, error]);
 
   // Users (students, teachers, parents) for stats
   const dispatch = useDispatch<AppDispatch>();
@@ -294,50 +308,68 @@ const AdminDashboard: React.FC = () => {
       <div className="bg-white rounded-xl shadow-md p-5">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Add User Button */}
           <button 
             onClick={handleAddUser}
-            className="flex flex-col items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors group"
+            title="Add New User"
           >
-            <Users className="h-8 w-8 text-blue-600 mb-2" />
-            <span className="text-sm font-medium text-blue-900">Add User</span>
+            <Users className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+            Add User
           </button>
+          
+          {/* Add Class Button */}
           <button 
             onClick={handleAddClass}
-            className="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors"
+            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 hover:border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors group"
+            title="Add New Class"
           >
-            <BookOpen className="h-8 w-8 text-green-600 mb-2" />
-            <span className="text-sm font-medium text-green-900">Add Class</span>
+            <BookOpen className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+            Add Class
           </button>
+          
+          {/* Send Notice Button */}
           <button 
             onClick={handleSendNotice}
-            className="flex flex-col items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-xl transition-colors"
+            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 transition-colors group"
+            title="Send Notice"
           >
-            <Bell className="h-8 w-8 text-purple-600 mb-2" />
-            <span className="text-sm font-medium text-purple-900">Send Notice</span>
+            <Bell className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+            Send Notice
           </button>
+          
+          {/* Schedule Event Button */}
           <button 
             onClick={handleScheduleEvent}
-            className="flex flex-col items-center p-4 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors"
+            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-orange-600 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 hover:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 transition-colors group"
+            title="Schedule Event"
           >
-            <Calendar className="h-8 w-8 text-orange-600 mb-2" />
-            <span className="text-sm font-medium text-orange-900">Schedule Event</span>
+            <Calendar className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+            Schedule Event
           </button>
         </div>
       </div>
 
       {/* Notice Modal */}
       {showNoticeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Send Notice</h3>
-              <button
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+              <div className="flex items-center space-x-3">
+                <Bell className="w-5 h-5" />
+                <h3 className="text-lg font-semibold">Send Notice</h3>
+              </div>
+              <button 
                 onClick={() => setShowNoticeModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="p-1 hover:bg-white/20 rounded-full transition-colors"
               >
-                <X className="h-6 w-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
+            
+            {/* Modal Body */}
+            <div className="p-6">
             
             <div className="space-y-4">
               <div>
@@ -359,7 +391,7 @@ const AdminDashboard: React.FC = () => {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="general">General</option>
-                  <option value="urgent">Urgent</option>
+                  <option value="important">Important</option>
                   <option value="event">Event</option>
                   <option value="holiday">Holiday</option>
                   <option value="exam">Exam</option>
@@ -395,18 +427,19 @@ const AdminDashboard: React.FC = () => {
               <div className="flex space-x-3">
                 <button
                   onClick={() => setShowNoticeModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateNotice}
-                  disabled={isCreatingNotice}
+                  disabled={isCreatingNotice || !noticeForm.title || !noticeForm.content}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {isCreatingNotice ? 'Publishing...' : 'Publish'}
+                  {isCreatingNotice ? 'Sending...' : 'Send Notice'}
                 </button>
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -414,17 +447,24 @@ const AdminDashboard: React.FC = () => {
 
       {/* Event Modal */}
       {showEventModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Schedule Event</h3>
-              <button
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+              <div className="flex items-center space-x-3">
+                <Calendar className="w-5 h-5" />
+                <h3 className="text-lg font-semibold">Schedule Event</h3>
+              </div>
+              <button 
                 onClick={() => setShowEventModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="p-1 hover:bg-white/20 rounded-full transition-colors"
               >
-                <X className="h-6 w-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
+            
+            {/* Modal Body */}
+            <div className="p-6">
             
             <div className="space-y-4">
               <div>
@@ -510,6 +550,7 @@ const AdminDashboard: React.FC = () => {
                   Schedule
                 </button>
               </div>
+            </div>
             </div>
           </div>
         </div>
