@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from 'react';
 import { 
-  DollarSign, Users, AlertTriangle, Search, Filter, 
+  DollarSign, Users, AlertTriangle, Search, 
   Eye, Download, CreditCard, CheckCircle, Clock, Plus
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -10,10 +11,8 @@ import {
 } from '../../store/api/feeApi';
 import { useGetClassesQuery } from '../../store/api/academicApi';
 import { useListUsersQuery } from '../../store/api/userApi';
-import { useAppSelector } from '../../store/hooks';
 
 const FeeManagement: React.FC = () => {
-  const { user } = useAppSelector(state => state.auth);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,9 +56,33 @@ const FeeManagement: React.FC = () => {
     collectedAmount: filteredFees.reduce((sum, fee) => sum + (fee.paidAmount || 0), 0)
   };
 
+  // Helper to normalize a class identifier to a valid ID from the classes list
+  const normalizeClassId = (cid: string): { validId?: string; found: boolean } => {
+    const cls = (classes as any[]).find((c: any) =>
+      c?._id === cid || c?.id === cid || c?.classId === cid || c?.name === cid
+    );
+    if (!cls) return { found: false };
+    return { validId: cls._id || cls.id || cls.classId, found: true };
+  };
+
   const handleCreateFee = async (feeData: CreateFeeRequest) => {
     try {
-      await createFee(feeData).unwrap();
+      // Ensure we always send a valid class ID. If the form provided a name like "Class 13",
+      // map it to the corresponding class object's ID.
+      const { validId, found } = normalizeClassId(feeData.classId);
+      const payload: CreateFeeRequest = {
+        ...feeData,
+        classId: found && validId ? validId : feeData.classId,
+      };
+
+      // Client-side guard: block if classId doesn't match any known class
+      const classIds = new Set((classes as any[]).map((c: any) => c?._id || c?.id || c?.classId));
+      if (!classIds.has(payload.classId)) {
+        toast.error('Please select a valid class');
+        return;
+      }
+
+      await createFee(payload).unwrap();
       toast.success('Fee record created successfully');
       setShowCreateModal(false);
       refetch();
@@ -217,9 +240,14 @@ const FeeManagement: React.FC = () => {
               className="input-field"
             >
               <option value="">All Classes</option>
-              {classes.map(cls => (
-                <option key={cls.id} value={cls.id}>{cls.name}</option>
-              ))}
+              {classes.map((cls: any) => {
+                const value = cls?._id || cls?.id || cls?.classId || '';
+                return (
+                  <option key={value || cls?.name} value={value}>
+                    {cls?.name ?? value}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -443,8 +471,8 @@ const CreateFeeModal: React.FC<CreateFeeModalProps> = ({ students, classes, onSa
               required
             >
               <option value="">Select Class</option>
-              {classes.map(cls => (
-                <option key={cls.id} value={cls.id}>{cls.name}</option>
+              {classes.map((cls: any) => (
+                <option key={cls._id || cls.id} value={cls._id || cls.id}>{cls.name}</option>
               ))}
             </select>
           </div>
