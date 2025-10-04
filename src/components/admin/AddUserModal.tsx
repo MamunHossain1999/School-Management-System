@@ -1,14 +1,10 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
-import { useDispatch } from 'react-redux';
 import { User, Mail, Phone, MapPin, Calendar, Lock } from 'lucide-react';
-
-import { createUser } from '../../store/slices/userSlice';
-
 import Modal from '../common/Modal';
 import toast from 'react-hot-toast';
-import type { AppDispatch } from '../../store';
 import type { RegisterData } from '../../types';
+import { useCreateUserMutation } from '../../store/api/userApi';
 
 interface AddUserModalProps {
   isOpen: boolean;
@@ -16,7 +12,7 @@ interface AddUserModalProps {
 }
 
 const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose }) => {
-  const dispatch = useDispatch<AppDispatch>();
+  const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   
   const {
     register,
@@ -32,7 +28,13 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose }) => {
 
   const onSubmit = async (data: RegisterData) => {
     try {
-      await dispatch(createUser(data)).unwrap();
+      // Ensure lastName is present as backend requires it
+      if (!data?.lastName || !data?.firstName) {
+        toast.error('First name and Last name are required');
+        return;
+      }
+
+      await createUser(data as any).unwrap();
       toast.success('User created successfully');
       reset();
       onClose();
@@ -81,10 +83,10 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose }) => {
 
         {/* Personal Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Full Name */}
+          {/* First Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Full Name *
+              First Name *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -92,19 +94,46 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose }) => {
               </div>
               <input
                 type="text"
-                {...register('name', {
-                  required: 'Full name is required',
+                {...register('firstName', {
+                  required: 'First name is required',
                   minLength: {
                     value: 2,
-                    message: 'Name must be at least 2 characters',
+                    message: 'First name must be at least 2 characters',
                   },
                 })}
                 className="input-field pl-10"
-                placeholder="Enter full name"
+                placeholder="Enter first name"
               />
             </div>
-            {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+            {errors.firstName && (
+              <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>
+            )}
+          </div>
+
+          {/* Last Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Last Name *
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <User className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                {...register('lastName', {
+                  required: 'Last name is required',
+                  minLength: {
+                    value: 2,
+                    message: 'Last name must be at least 2 characters',
+                  },
+                })}
+                className="input-field pl-10"
+                placeholder="Enter last name"
+              />
+            </div>
+            {errors.lastName && (
+              <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>
             )}
           </div>
 
@@ -313,10 +342,10 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose }) => {
           </button>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isCreating}
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Creating...' : 'Create User'}
+            {isSubmitting || isCreating ? 'Creating...' : 'Create User'}
           </button>
         </div>
       </form>
