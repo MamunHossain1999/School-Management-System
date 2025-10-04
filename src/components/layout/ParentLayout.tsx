@@ -25,6 +25,7 @@ import type { RootState } from '../../store';
 import type { AppDispatch } from '../../store';
 import { logoutUser } from '../../store/slices/authSlice';
 import ProfileDropdown from '../common/ProfileDropdown';
+import { PageContainer } from '../common/Responsive';
 import toast from 'react-hot-toast';
 import { routes } from '../../routes';
 
@@ -172,8 +173,10 @@ const ParentLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto">
+          <PageContainer>
+            <Outlet />
+          </PageContainer>
         </main>
       </div>
 
