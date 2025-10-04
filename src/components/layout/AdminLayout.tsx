@@ -29,6 +29,7 @@ import {
 import type { RootState } from '../../store';
 import { logoutUser } from '../../store/slices/authSlice';
 import ProfileDropdown from '../common/ProfileDropdown';
+import { PageContainer } from '../common/Responsive';
 import toast from 'react-hot-toast';
 import { useGetUnreadMessageCountQuery } from '../../store/api/noticeApi';
 import { fetchUsers } from '../../store/slices/userSlice';
@@ -47,11 +48,18 @@ const AdminLayout: React.FC = () => {
     dispatch(fetchUsers());
   }, [dispatch]);
 
-  // Unread messages badge (communication)
-  const { data: unreadData } = useGetUnreadMessageCountQuery();
-  const unreadCount = typeof unreadData?.count === 'number' ? unreadData.count : 0;
+  // Unread messages badge (communication) - Temporarily disabled until backend is ready
+  const { error } = useGetUnreadMessageCountQuery(undefined, {
+    skip: true // Skip the query until backend endpoint is implemented
+  });
+  const unreadCount = 0; // Default to 0 until backend is ready
+  
+  // Log error for debugging if endpoint is not found
+  if (error) {
+    console.warn('Unread message count endpoint not available:', error);
+  }
 
-  type AcademicTab = 'Classes' | 'Subjects' | 'Assignments';
+  type AcademicTab = 'Classes' | 'Subjects' | 'Sections' | 'Enrollments' | 'Assignments';
   type MenuItem = {
     path: string;
     icon: React.ComponentType<{ className?: string }>;
@@ -63,9 +71,11 @@ const AdminLayout: React.FC = () => {
     { path: routes.admin.dashboard, icon: Home, label: 'Dashboard' },
     { path: routes.admin.users, icon: Users, label: 'User Management' },
     { path: routes.admin.academic, icon: BookOpen, label: 'Academic' },
-    // Route Classes/Subjects/Assignments through Academic tabs for a unified UX
+    // Route Classes/Subjects/Sections/Enrollments through Academic tabs for a unified UX
     { path: routes.admin.academic, tab: 'Classes', icon: GraduationCap, label: 'Classes' },
     { path: routes.admin.academic, tab: 'Subjects', icon: BookOpen, label: 'Subjects' },
+    { path: routes.admin.academic, tab: 'Sections', icon: Users, label: 'Sections' },
+    { path: routes.admin.academic, tab: 'Enrollments', icon: UserPlus, label: 'Enrollments' },
     { path: routes.admin.classRoutine, icon: Calendar, label: 'Class Routine' },
     { path: routes.admin.academic, tab: 'Assignments', icon: FileText, label: 'Assignments' },
     { path: routes.admin.attendance, icon: ClipboardList, label: 'Attendance' },
@@ -221,8 +231,10 @@ const AdminLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto">
+          <PageContainer>
+            <Outlet />
+          </PageContainer>
         </main>
       </div>
 
