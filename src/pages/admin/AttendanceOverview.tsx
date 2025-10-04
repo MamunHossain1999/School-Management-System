@@ -18,6 +18,8 @@ import {
   useGetAttendanceStatsQuery,
   useGetAttendanceSummaryQuery,
   useGetAttendanceRecordsQuery,
+  useUpdateAttendanceRecordMutation,
+  useDeleteAttendanceRecordMutation,
 } from '../../store/api/attendanceApi';
 import { useGetClassesQuery } from '../../store/api/academicApi';
 
@@ -27,6 +29,8 @@ const AttendanceOverview: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('');
   const [dateRange, setDateRange] = useState('today');
   const [searchTerm, setSearchTerm] = useState('');
+  const [editModal, setEditModal] = useState<{ isOpen: boolean; record: any | null; status: 'present' | 'absent' | 'late' | 'excused'; remarks: string; isProcessing: boolean }>({ isOpen: false, record: null, status: 'present', remarks: '', isProcessing: false });
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; record: any | null; isProcessing: boolean }>({ isOpen: false, record: null, isProcessing: false });
 
   // API queries
   const { data: classes } = useGetClassesQuery();
@@ -46,6 +50,9 @@ const AttendanceOverview: React.FC = () => {
     classId: selectedClass || undefined,
     date: selectedDate,
   });
+
+  const [updateAttendanceRecord] = useUpdateAttendanceRecordMutation();
+  const [deleteAttendanceRecord] = useDeleteAttendanceRecordMutation();
 
   // Filter records based on search
   const filteredRecords = attendanceRecords?.filter((record: any) =>
@@ -362,7 +369,7 @@ const AttendanceOverview: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {(attendanceSummary || attendanceStats?.classWiseStats)?.map((classData: any, index: number) => {
+              {(Array.isArray(attendanceSummary) ? attendanceSummary : (attendanceStats?.classWiseStats || [])).map((classData: any, index: number) => {
                 const totalStudents = classData.totalStudents || classData.total;
                 const presentCount = classData.presentCount || classData.present;
                 const rate = totalStudents > 0 ? (presentCount / totalStudents) * 100 : (classData.attendancePercentage || 0);
@@ -448,6 +455,9 @@ const AttendanceOverview: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Marked By
                   </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -492,10 +502,127 @@ const AttendanceOverview: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {record.markedBy?.name || 'System'}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() => setEditModal({ isOpen: true, record, status: record.status, remarks: record.remarks || '', isProcessing: false })}
+                          className="px-2 py-1 rounded-md border text-blue-600 hover:bg-blue-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => setDeleteModal({ isOpen: true, record, isProcessing: false })}
+                          className="px-2 py-1 rounded-md border text-red-600 hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Attendance Modal */}
+      {editModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Attendance</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={editModal.status}
+                  onChange={(e) => setEditModal(prev => ({ ...prev, status: e.target.value as any }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="present">Present</option>
+                  <option value="absent">Absent</option>
+                  <option value="late">Late</option>
+                  <option value="excused">Excused</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+                <input
+                  type="text"
+                  value={editModal.remarks}
+                  onChange={(e) => setEditModal(prev => ({ ...prev, remarks: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => !editModal.isProcessing && setEditModal({ isOpen: false, record: null, status: 'present', remarks: '', isProcessing: false })}
+                  disabled={editModal.isProcessing}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!editModal.record) return;
+                    try {
+                      setEditModal(prev => ({ ...prev, isProcessing: true }));
+                      await updateAttendanceRecord({ id: editModal.record._id, status: editModal.status, remarks: editModal.remarks || undefined }).unwrap();
+                    } catch (error) {
+                      console.error('Failed to update attendance record', error);
+                    } finally {
+                      setEditModal({ isOpen: false, record: null, status: 'present', remarks: '', isProcessing: false });
+                    }
+                  }}
+                  disabled={editModal.isProcessing}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {editModal.isProcessing ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Delete Attendance Record</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-700">Are you sure you want to delete the record for <strong>{deleteModal.record?.student?.name}</strong> dated <strong>{deleteModal.record ? new Date(deleteModal.record.date).toLocaleDateString() : ''}</strong>?</p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => !deleteModal.isProcessing && setDeleteModal({ isOpen: false, record: null, isProcessing: false })}
+                  disabled={deleteModal.isProcessing}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!deleteModal.record) return;
+                    try {
+                      setDeleteModal(prev => ({ ...prev, isProcessing: true }));
+                      await deleteAttendanceRecord(deleteModal.record._id).unwrap();
+                    } catch (error) {
+                      console.error('Failed to delete attendance record', error);
+                    } finally {
+                      setDeleteModal({ isOpen: false, record: null, isProcessing: false });
+                    }
+                  }}
+                  disabled={deleteModal.isProcessing}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-60"
+                >
+                  {deleteModal.isProcessing ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
