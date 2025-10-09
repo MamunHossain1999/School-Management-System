@@ -167,36 +167,34 @@ const StudentProfile: React.FC = () => {
       : user?.name || "Student";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Student Profile</h1>
-          <p className="text-gray-600">
-            Manage your academic profile and information
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Student Profile</h1>
+          <p className="text-gray-600 text-sm sm:text-base">Manage your academic profile and information</p>
         </div>
         {!isEditing ? (
           <button
             onClick={() => setIsEditing(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center space-x-2"
+            className="w-full sm:w-auto px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center justify-center space-x-2"
           >
             <Edit2 className="h-4 w-4" />
             <span>Edit Profile</span>
           </button>
         ) : (
-          <div className="flex space-x-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center space-x-2 disabled:opacity-60"
+              className="w-full sm:w-auto px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center justify-center space-x-2 disabled:opacity-60"
             >
               <Save className="h-4 w-4" />
               <span>Save</span>
             </button>
             <button
               onClick={handleCancel}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center space-x-2"
+              className="w-full sm:w-auto px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center justify-center space-x-2"
             >
               <X className="h-4 w-4" />
               <span>Cancel</span>
@@ -206,19 +204,19 @@ const StudentProfile: React.FC = () => {
       </div>
 
       {/* Profile Info */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Left Column */}
         <div className="lg:col-span-1">
-          <div className="bg-white p-6 rounded-lg shadow-sm border text-center">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border text-center">
             <div className="relative inline-block">
               {((profile as any)?.profilePicture || (user as any)?.profilePicture) ? (
                 <img
                   src={(profile as any)?.profilePicture || (user as any)?.profilePicture}
                   alt="Profile"
-                  className="w-32 h-32 rounded-full object-cover mx-auto mb-4 border"
+                  className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full object-cover mx-auto mb-4 border"
                 />
               ) : (
-                <div className="w-32 h-32 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-white font-bold text-4xl">
                     {user?.firstName?.charAt(0) || user?.name?.charAt(0) || "S"}
                   </span>
@@ -233,13 +231,13 @@ const StudentProfile: React.FC = () => {
                 </>
               )}
             </div>
-            <h2 className="text-xl font-semibold text-gray-900">{displayName}</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">{displayName}</h2>
             <p className="text-purple-600 capitalize font-medium">{user?.role}</p>
-            <p className="text-gray-500 text-sm mt-1">{user?.email}</p>
+            <p className="text-gray-500 text-sm mt-1 break-all">{user?.email}</p>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border mt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border mt-4 sm:mt-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
               Academic Information
             </h3>
             <div className="space-y-4">
@@ -250,11 +248,11 @@ const StudentProfile: React.FC = () => {
                 { label: "Roll Number", value: formData.rollNumber },
               ].map((item) => (
                 <div key={item.label}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     {item.icon && <item.icon className="inline h-4 w-4 mr-1" />}
                     {item.label}
                   </label>
-                  <p className="text-gray-900 py-2">
+                  <p className="text-gray-900 py-1 sm:py-2">
                     {item.value || "Not assigned"}
                   </p>
                 </div>
@@ -265,11 +263,11 @@ const StudentProfile: React.FC = () => {
 
         {/* Right Column */}
         <div className="lg:col-span-2">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">
               Personal Information
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {[
                 { label: "First Name", name: "firstName", icon: User, type: "text" },
                 { label: "Last Name", name: "lastName", icon: User, type: "text" },
@@ -279,7 +277,7 @@ const StudentProfile: React.FC = () => {
                 { label: "Address", name: "address", icon: MapPin, type: "textarea", colSpan: 2 },
               ].map((field) => (
                 <div key={field.name} className={field.colSpan ? "md:col-span-2" : ""}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     {field.icon && <field.icon className="inline h-4 w-4 mr-1" />}
                     {field.label}
                   </label>
@@ -302,7 +300,7 @@ const StudentProfile: React.FC = () => {
                       />
                     )
                   ) : (
-                    <p className="text-gray-900 py-2">
+                    <p className="text-gray-900 py-1 sm:py-2 break-words">
                       {formData[field.name as keyof typeof formData] || "Not provided"}
                     </p>
                   )}
@@ -314,15 +312,15 @@ const StudentProfile: React.FC = () => {
       </div>
 
       {/* Account Settings */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Settings</h3>
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Account Settings</h3>
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="min-w-0">
               <h4 className="font-medium text-gray-900">Change Password</h4>
               <p className="text-sm text-gray-600">Update your account password</p>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <input
                 type="password"
                 placeholder="Current"
@@ -330,7 +328,7 @@ const StudentProfile: React.FC = () => {
                 onChange={(e) =>
                   setPasswordData({ ...passwordData, currentPassword: e.target.value })
                 }
-                className="px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full sm:w-40 px-2 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
               <input
                 type="password"
@@ -339,12 +337,12 @@ const StudentProfile: React.FC = () => {
                 onChange={(e) =>
                   setPasswordData({ ...passwordData, newPassword: e.target.value })
                 }
-                className="px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full sm:w-40 px-2 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
               <button
                 onClick={handlePasswordChange}
                 disabled={changingPassword}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-60"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-60"
               >
                 Change
               </button>
